@@ -45,3 +45,16 @@ def yaml_file_to_config(path: Path) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"{path} does not contain a YAML mapping")
     return data
+
+
+def normalize(obj: object) -> object:
+    """Recursively convert ruamel.yaml CommentedMap/Seq to plain dict/list.
+
+    Used to produce a clean JSON-serialisable dict for pushing to HA and for
+    equality comparisons between local YAML and the current HA state.
+    """
+    if isinstance(obj, dict):
+        return {k: normalize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [normalize(v) for v in obj]
+    return obj

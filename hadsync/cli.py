@@ -294,7 +294,143 @@ def push(
     ] = False,
 ) -> None:
     """Push local YAML dashboards to HA."""
-    _not_implemented("push")
+    asyncio.run(_push_async(dashboard_id, skip_validation))
+
+
+async def _push_async(dashboard_id: Optional[str], skip_validation: bool) -> None:
+    from rich.table import Table
+    from hadsync.converter import LOVELACE_FILENAME, count_cards, normalize, yaml_file_to_config
+    from hadsync.validator import Severity, has_errors, validate
+    from hadsync.state import record_push
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    try:
+        async with HAWebSocketClient(cfg.ha_url, cfg.ha_token) as client:
+            panels = await client.get_panels()
+            panel_by_path = {v.get("url_path", k): v for k, v in panels.items()}
+
+            # Resolve targets from local workspace or explicit arg
+            if dashboard_id:
+                targets = [dashboard_id]
+            else:
+                targets = sorted(
+                    url_path for url_path in panel_by_path
+                    if (cfg.workspace / url_path / LOVELACE_FILENAME).exists()
+                )
+
+            if not targets:
+                output.warn("No local dashboard files found. Run 'hadsync pull' first.")
+                raise typer.Exit(0)
+
+            pushed = skipped = 0
+
+            for url_path in targets:
+                title = (panel_by_path.get(url_path) or {}).get("title", url_path)
+                output.console.print(f"\n[bold cyan]{url_path}[/bold cyan]  ({title})")
+
+                yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
+
+                if not yaml_path.exists():
+                    output.warn(f"  No local file — run 'hadsync pull {url_path}' first.")
+                    skipped += 1
+                    continue
+
+                if url_path not in panel_by_path:
+                    output.error(f"  Dashboard not found in HA — cannot push.")
+                    skipped += 1
+                    continue
+
+                # --- Validation ---
+                if not skip_validation:
+                    issues = validate(yaml_path)
+                    for issue in issues:
+                        fn = output.error if issue.severity == Severity.ERROR else output.warn
+                        fn(f"  {issue}")
+                    if has_errors(issues):
+                        output.error("  Blocked by validation errors.")
+                        skipped += 1
+                        continue
+
+                # --- Load local config and normalize ---
+                try:
+                    local_raw = yaml_file_to_config(yaml_path)
+                except Exception as e:
+                    output.error(f"  Cannot read local file: {e}")
+                    skipped += 1
+                    continue
+                local_config = normalize(local_raw)
+
+                # --- Fetch current HA state ---
+                try:
+                    ha_config = normalize(await client.get_dashboard_config(url_path))
+                except Exception as e:
+                    output.error(f"  Cannot fetch current HA state: {e}")
+                    skipped += 1
+                    continue
+
+                # --- No-op guard ---
+                if local_config == ha_config:
+                    output.info("  Already up to date — no changes to push.")
+                    skipped += 1
+                    continue
+
+                # --- Change summary ---
+                ha_views, ha_cards = count_cards(ha_config)
+                local_views, local_cards = count_cards(local_config)
+
+                summary = Table(show_header=True, box=None, padding=(0, 2))
+                summary.add_column("", style="dim")
+                summary.add_column("Views", justify="right")
+                summary.add_column("Cards", justify="right")
+                summary.add_row("Current HA", str(ha_views), str(ha_cards))
+                summary.add_row("Local (to push)", str(local_views), str(local_cards))
+                output.console.print(summary)
+
+                if local_views < ha_views:
+                    output.warn(f"  ⚠  Will REMOVE {ha_views - local_views} view(s) from HA.")
+                if local_cards < ha_cards:
+                    output.warn(f"  ⚠  Will REMOVE {ha_cards - local_cards} card(s) from HA.")
+                if local_views == 0 and ha_views > 0 and not skip_validation:
+                    output.error(
+                        "  Refusing to push: local config has 0 views but HA has "
+                        f"{ha_views}. This would wipe the dashboard. "
+                        "Use --skip-validation to override."
+                    )
+                    skipped += 1
+                    continue
+
+                # --- Dry run ---
+                if _state.dry_run:
+                    output.info(f"  [dry-run] Would push {local_views} views, {local_cards} cards — not sent.")
+                    continue
+
+                # --- Confirm ---
+                if cfg.push.confirm and not _state.yes:
+                    confirmed = typer.confirm(f"  Push '{url_path}' to HA?", default=False)
+                    if not confirmed:
+                        output.info("  Skipped.")
+                        skipped += 1
+                        continue
+
+                # --- Push ---
+                await client.save_dashboard_config(url_path, local_config)
+                record_push(cfg.workspace, url_path)
+                output.success(f"  Pushed  ({local_views} views, {local_cards} cards)")
+                pushed += 1
+
+    except HAAuthError as e:
+        output.error(f"Authentication failed: {e}")
+        raise typer.Exit(1)
+    except HAWebSocketError as e:
+        output.error(f"Connection error: {e}")
+        raise typer.Exit(1)
+
+    output.console.print(f"\n[dim]{pushed} pushed, {skipped} skipped[/dim]")
 
 
 @app.command()
