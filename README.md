@@ -25,11 +25,18 @@ Requires Python 3.11+.
 ### Install from source
 
 ```bash
-# with pip
+# with pip (installs into current Python environment, command available directly)
 pip install -e ".[dev]"
 
-# with uv (faster, manages virtualenv automatically)
+# with uv (faster, manages .venv automatically)
 uv sync --extra dev
+
+# after uv sync, run commands via uv run:
+uv run hadsync --help
+
+# or activate the venv for the session:
+source .venv/bin/activate
+hadsync --help
 ```
 
 ## Two-Repo Setup (Recommended)
@@ -148,18 +155,17 @@ Files excluded from git (auto-added to `.gitignore` by `hadsync init`):
 ## Development
 
 ```bash
-# Install with dev dependencies (uv — recommended)
-uv sync --extra dev
-
-# or with pip
-pip install -e ".[dev]"
+# Install with dev dependencies
+uv sync --extra dev          # uv (recommended)
+pip install -e ".[dev]"      # pip
 
 # Run tests
-pytest tests/
+uv run pytest tests/         # via uv
+pytest tests/                # if venv is activated
 
 # Run against a real HA instance
 export HA_TOKEN=eyJ...
-hadsync list
+uv run hadsync list
 ```
 
 ## Implementation Status
