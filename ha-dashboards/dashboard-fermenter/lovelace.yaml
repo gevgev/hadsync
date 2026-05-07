@@ -1,0 +1,104 @@
+views:
+- path: default_view
+  title: Fermenter Area
+  cards:
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: vertical-stack
+      cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.mesh_one_meter_plus_6030_temperature
+        name: Fermenter 1 Temp
+        icon: mdi:thermometer
+      - type: custom:mushroom-entity-card
+        entity: sensor.mesh_two_meter_plus_3c07_temperature
+        name: Fermenter 2 Temp
+        icon: mdi:thermometer
+      - type: custom:mushroom-entity-card
+        entity: sensor.meter_patio_temperature
+        name: Patio Ambient Temp
+        icon: mdi:thermometer
+      - type: custom:mushroom-entity-card
+        entity: sensor.mesh_one_meter_plus_6030_humidity
+        name: Fermenter 1 Humidity
+        icon: mdi:water-percent
+      - type: custom:mushroom-entity-card
+        entity: sensor.mesh_two_meter_plus_3c07_humidity
+        name: Fermenter 2 Humidity
+        icon: mdi:water-percent
+      - type: custom:mushroom-entity-card
+        entity: sensor.meter_patio_humidity
+        name: Patio Ambient Humidity
+        icon: mdi:water-percent
+    - type: entities
+      title: Controls
+      entities:
+      - entity: light.patio_deck_lights
+        name: Deck Lights
+      - entity: switch.mesh_one
+        name: Mesh One Plug
+      - entity: switch.mesh_two
+        name: Mesh Two Plug
+      - entity: light.ocamera_light
+        name: OCamera Light
+      - entity: light.widecamera_2_widecamera_2_light
+        name: Widecamera-2 Light
+  - type: horizontal-stack
+    cards:
+    - show_state: false
+      show_name: true
+      camera_view: auto
+      fit_mode: cover
+      type: picture-entity
+      entity: camera.ocamera
+      name: OCamera
+    - type: picture-entity
+      entity: camera.widecamera_2_mywidecamera_2
+      name: Widecamera-2
+      camera_view: auto
+      show_name: true
+      show_state: false
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:mushroom-template-card
+      entity: sensor.fermenter_temp_delta
+      primary: Δ Fermenter
+      secondary: '{{ states(entity) }} °C'
+      icon: mdi:delta
+      tap_action:
+        action: more-info
+      color: "{% set d = states(entity) | float(0) %} {% if d | abs <= 0.5 %}\n  green\n{% elif d | abs <= 1.0 %}\n  yellow\n{% else %}\n  red\n{% endif %}\n"
+      vertical: true
+      features_position: bottom
+    - type: custom:mushroom-template-card
+      entity: sensor.living_room_light_level
+      primary: Light Level
+      secondary: '{{ states(entity) | float | round(2) }} lx'
+      icon: mdi:brightness-6
+      icon_color: "{% set d = states(entity) | float(0) %}\n{% if d | abs <= 2.0 %}\n  red\n{% elif d | abs <= 6.0 %}\n  yellow\n{% else %}\n  green\n{% endif %}\n"
+      layout: vertical
+      tap-action:
+        action: more-info
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: history-graph
+      title: History
+      hours_to_show: 12
+      entities:
+      - entity: sensor.mesh_one_meter_plus_6030_temperature
+        name: Fermenter 1 Temp
+      - entity: sensor.mesh_two_meter_plus_3c07_temperature
+        name: Fermenter 2 Temp
+      - entity: sensor.meter_patio_temperature
+        name: Patio Ambient Temp
+      - entity: switch.mesh_one
+        name: Mesh One Plug
+      - entity: switch.mesh_two
+        name: Mesh Two Plug
+  type: masonry

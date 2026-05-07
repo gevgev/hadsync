@@ -1,0 +1,77 @@
+views:
+- title: Climate trends
+  cards:
+  - type: history-graph
+    entities:
+    - entity: sensor.meter_dining_room_temperature
+    - entity: sensor.meter_kitchen_temperature
+    - entity: sensor.living_room_temperature
+    - entity: sensor.meter_living_room_temperature
+    title: 1st Floor Temperature
+  - type: history-graph
+    entities:
+    - entity: sensor.meter_aram_temperature
+    - entity: sensor.meter_nane_temperature
+    - entity: sensor.meter_hallway_temperature
+    - entity: sensor.meter_master_bedroom_temperature
+    title: 2nd Floor Temperature
+    hours_to_show: 12
+  - type: history-graph
+    entities:
+    - entity: sensor.meter_wine_cooler_down_temperature
+    - entity: sensor.meter_wine_cooler_up_temperature
+    title: Wine Cooler Temperature
+  - chart_type: line
+    period: hour
+    days_to_show: 30
+    type: statistics-graph
+    entities:
+    - sensor.living_room_humidity
+    - sensor.meter_dining_room_humidity
+    - sensor.meter_kitchen_humidity
+    stat_types:
+    - mean
+    title: 1st Floor Humidity
+  - chart_type: line
+    period: hour
+    days_to_show: 30
+    type: statistics-graph
+    entities:
+    - sensor.meter_aram_humidity
+    - sensor.meter_hallway_humidity
+    - sensor.meter_master_bedroom_humidity
+    - sensor.meter_nane_humidity
+    stat_types:
+    - mean
+    title: 2nd Floor Humidity
+  - chart_type: line
+    period: hour
+    days_to_show: 30
+    type: statistics-graph
+    entities:
+    - sensor.meter_wine_cooler_up_humidity
+    - sensor.meter_wine_cooler_down_humidity
+    stat_types:
+    - mean
+    title: Wine Cooler Humidity
+  - type: history-graph
+    entities:
+    - entity: sensor.meter_patio_temperature
+    - entity: sensor.meter_kitchen_temperature
+    title: Patio Temperature
+  - chart_type: line
+    period: hour
+    days_to_show: 30
+    type: statistics-graph
+    entities:
+    - sensor.meter_patio_humidity
+    - sensor.meter_kitchen_humidity
+    stat_types:
+    - mean
+    title: Patio Humidity
+  - type: history-graph
+    entities:
+    - entity: sensor.freezer_meter_temperature
+    - entity: sensor.freezer_meter_humidity
+    title: Freezer Temperature
+  type: masonry

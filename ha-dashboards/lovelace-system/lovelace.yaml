@@ -1,0 +1,100 @@
+title: System
+views:
+- title: System
+  icon: mdi:server
+  cards:
+  - type: glance
+    title: 💻 System Health
+    entities:
+    - entity: sensor.processor_use
+      name: CPU
+    - entity: sensor.memory_use_percent
+      name: Memory
+    - entity: sensor.disk_use_percent
+      name: Disk
+    - entity: sensor.processor_temperature
+      name: CPU Temp
+    - entity: sensor.disk_free
+      name: Disk Free
+    - entity: sensor.memory_free
+      name: RAM Free
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      title: CPU Usage
+      entity: sensor.processor_use
+      min: 0
+      max: 100
+      needle: true
+      severity:
+        green: 0
+        yellow: 60
+        red: 85
+    - type: gauge
+      title: Memory Usage
+      entity: sensor.memory_use_percent
+      min: 0
+      max: 100
+      needle: true
+      severity:
+        green: 0
+        yellow: 65
+        red: 85
+  - type: horizontal-stack
+    cards:
+    - type: gauge
+      title: Disk Usage
+      entity: sensor.disk_use_percent
+      min: 0
+      max: 100
+      needle: true
+      severity:
+        green: 0
+        yellow: 70
+        red: 88
+    - type: gauge
+      title: CPU Temperature
+      entity: sensor.processor_temperature
+      min: 30
+      max: 85
+      needle: true
+      unit: °C
+      severity:
+        green: 0
+        yellow: 60
+        red: 75
+  - type: entities
+    title: 💾 Backup Status
+    entities:
+    - entity: sensor.backup_state
+      name: Backup State
+    - entity: binary_sensor.backups_stale
+      name: Backups Stale
+    - entity: sensor.backup_backup_manager_state
+      name: Manager State
+    - entity: sensor.backup_last_successful_automatic_backup
+      name: Last Successful Backup
+    - entity: sensor.backup_next_scheduled_automatic_backup
+      name: Next Scheduled Backup
+  - type: history-graph
+    title: 📈 Resource Trends (24h)
+    hours_to_show: 24
+    entities:
+    - entity: sensor.processor_use
+      name: CPU
+    - entity: sensor.memory_use_percent
+      name: Memory
+    - entity: sensor.disk_use_percent
+      name: Disk
+  - type: horizontal-stack
+    cards:
+    - type: sensor
+      entity: sensor.system_monitor_network_throughput_in_end0
+      name: Network In
+      graph: line
+      hours_to_show: 1
+    - type: sensor
+      entity: sensor.system_monitor_network_throughput_out_end0
+      name: Network Out
+      graph: line
+      hours_to_show: 1

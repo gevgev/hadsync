@@ -1,0 +1,33 @@
+title: Presence
+views:
+- title: Presence
+  icon: mdi:map-marker-account
+  cards:
+  - type: horizontal-stack
+    cards:
+    - type: entities
+      title: Gevorg
+      icon: mdi:account
+      entities:
+      - entity: person.gevorg_gevorgyan
+        name: Location
+    - type: entities
+      title: Anna
+      icon: mdi:account-heart
+      entities:
+      - entity: person.anna_mamalashvili
+        name: Location
+  - type: markdown
+    title: 📍 Last Seen
+    content: "-\n    | | Person | Status | Last Updated |\n    |---|--------|--------|-------------|\n    | 👤 | Gevorg | {{ states('person.gevorg_gevorgyan') | title }} | {{ relative_time(states.person.gevorg_gevorgyan.last_changed) }} ago |\n    | 💗 | Anna | {{ states('person.anna_mamalashvili') | title }} | {{ relative_time(states.person.anna_mamalashvili.last_changed) }} ago |"
+  - type: map
+    entities:
+    - entity: person.gevorg_gevorgyan
+    - entity: person.anna_mamalashvili
+    hours_to_show: 0
+    default_zoom: 13
+    aspect_ratio: 16:9
+    theme_mode: dark
+  type: masonry
+  visible:
+  - user: 5fc57d1ac8e240f4807f3ad5a16c9c9c

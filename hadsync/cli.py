@@ -175,7 +175,94 @@ def pull(
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Skip entity cache refresh.")] = False,
 ) -> None:
     """Pull dashboards from HA to local YAML."""
-    _not_implemented("pull")
+    asyncio.run(_pull_async(dashboard_id, no_cache))
+
+
+async def _pull_async(dashboard_id: Optional[str], no_cache: bool) -> None:
+    from hadsync.converter import (
+        LOVELACE_FILENAME, config_to_yaml_file, count_cards, is_strategy_dashboard,
+    )
+    from hadsync.state import record_pull
+    from hadsync.ha_rest import HARestError, get_entity_states
+    from hadsync.entities import write_entity_cache
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    try:
+        async with HAWebSocketClient(cfg.ha_url, cfg.ha_token) as client:
+            panels = await client.get_panels()
+
+            # Resolve target dashboards
+            if dashboard_id:
+                url_paths = {v.get("url_path", k) for k, v in panels.items()}
+                if dashboard_id not in url_paths:
+                    output.error(
+                        f"Dashboard '{dashboard_id}' not found. "
+                        "Run 'hadsync list' to see available dashboards."
+                    )
+                    raise typer.Exit(1)
+                targets = {k: v for k, v in panels.items() if v.get("url_path", k) == dashboard_id}
+            elif cfg.pull.dashboards == "all":
+                targets = panels
+            else:
+                wanted = set(cfg.pull.dashboards) if isinstance(cfg.pull.dashboards, list) else set()
+                targets = {k: v for k, v in panels.items() if v.get("url_path", k) in wanted}
+
+            pulled, skipped = 0, 0
+            for panel_key, panel in sorted(targets.items(), key=lambda x: x[1].get("title", "")):
+                url_path = panel.get("url_path", panel_key)
+                title = panel.get("title", url_path)
+                try:
+                    config = await client.get_dashboard_config(url_path)
+                except Exception as e:
+                    output.warn(f"Skipped {url_path} — fetch failed: {e}")
+                    skipped += 1
+                    continue
+
+                if is_strategy_dashboard(config):
+                    output.warn(f"Skipped {url_path} ({title}) — strategy dashboard is read-only")
+                    skipped += 1
+                    continue
+
+                yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
+                config_to_yaml_file(config, yaml_path)
+                record_pull(cfg.workspace, url_path)
+
+                n_views, n_cards = count_cards(config)
+                try:
+                    display = yaml_path.relative_to(Path.cwd())
+                except ValueError:
+                    display = yaml_path
+                output.success(f"Pulled {url_path}  →  {display}  ({n_views} views, {n_cards} cards)")
+                pulled += 1
+
+    except HAAuthError as e:
+        output.error(f"Authentication failed: {e}")
+        raise typer.Exit(1)
+    except HAWebSocketError as e:
+        output.error(f"Connection error: {e}")
+        raise typer.Exit(1)
+
+    # Entity cache refresh
+    if not no_cache and cfg.pull.refresh_entities:
+        try:
+            states = get_entity_states(cfg.ha_url, cfg.ha_token)
+            count = write_entity_cache(cfg.workspace, states)
+            output.success(f"Entity cache refreshed  →  .ha-entities.json  ({count} entities)")
+        except HARestError as e:
+            output.warn(f"Entity cache refresh failed: {e}")
+
+    if pulled or skipped:
+        parts = []
+        if pulled:
+            parts.append(f"{pulled} pulled")
+        if skipped:
+            parts.append(f"{skipped} skipped")
+        output.console.print(f"\n[dim]{', '.join(parts)}[/dim]")
 
 
 @app.command()

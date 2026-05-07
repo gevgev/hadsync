@@ -1,0 +1,50 @@
+views:
+- title: Battery Status
+  cards:
+  - type: entities
+    entities:
+    - entity: sensor.fire_place_battery
+    - entity: sensor.meter_hallway_battery
+    - entity: sensor.meter_aram_battery
+    - entity: sensor.meter_nane_battery
+    - entity: sensor.meter_master_bedroom_battery
+    - entity: sensor.meter_living_room_battery
+    - entity: sensor.meter_dining_room_battery
+    - entity: sensor.meter_wine_cooler_up_battery
+    - entity: sensor.meter_wine_cooler_down_battery
+    - entity: sensor.meter_plus_kitchen_3264_battery
+    - entity: sensor.meter_kitchen_battery
+    - entity: sensor.meter_patio_battery
+    - entity: sensor.freezer_meter_battery
+    - entity: sensor.mesh_one_meter_plus_6030_battery
+    - entity: sensor.mesh_two_meter_plus_3c07_battery
+    title: Battery Status SwitchBot
+    state_color: true
+  - type: entities
+    entities:
+    - entity: sensor.front_door_battery
+    - entity: sensor.doorbell_battery_percentage
+    - entity: sensor.lutron_aurora_master_bedroom_battery
+    - entity: sensor.hue_dimmer_switch_living_room_battery
+    state_color: true
+  - type: entities
+    entities:
+    - entity: sensor.gevs_iphone_16_battery_level
+    - entity: sensor.anna_s_iphone_battery_level
+    title: Phones
+    state_color: true
+  - type: entities
+    entities:
+    - entity: sensor.left_blind_battery
+    - entity: sensor.right_blind_battery
+    - entity: sensor.left_open_close_remote_battery
+    - entity: sensor.right_open_close_remote_battery
+    title: IKEA Blinds
+    state_color: true
+  - type: entities
+    entities:
+    - entity: sensor.roomba_battery
+    title: Roomba
+    state_color: true
+  type: masonry
+title: Battery

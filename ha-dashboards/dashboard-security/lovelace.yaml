@@ -1,0 +1,42 @@
+title: Security
+views:
+- title: Security
+  icon: mdi:shield-home
+  cards:
+  - type: horizontal-stack
+    cards:
+    - type: picture-glance
+      title: Wide Camera
+      entities: []
+      camera_image: camera.mywidecamera
+    - type: picture-glance
+      title: Wide Camera 2
+      entities: []
+      camera_image: camera.widecamera_2_mywidecamera_2
+  - type: glance
+    title: 🔐 Security Status
+    entities:
+    - entity: lock.front_door
+      name: Lock
+    - entity: binary_sensor.front_door_open
+      name: Door
+    - entity: sensor.front_door_battery
+      name: Battery
+    - entity: sensor.front_door_operator
+      name: Mode
+  - type: horizontal-stack
+    cards:
+    - type: picture-glance
+      title: Ocamera
+      entities: []
+      camera_image: camera.ocamera
+    - type: picture-glance
+      title: Kitchen
+      entities: []
+      camera_image: camera.kitchen
+  - type: logbook
+    title: 📋 Door Activity (Last 24h)
+    entities:
+    - lock.front_door
+    - binary_sensor.front_door_open
+    hours_to_show: 24

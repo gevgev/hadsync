@@ -1,0 +1,22 @@
+title: Alerts Dashboard
+views:
+- title: Alerts
+  icon: mdi:bell-alert
+  path: alerts
+  cards:
+  - type: vertical-stack
+    cards:
+    - type: markdown
+      content: "{% set slots = [\n  states('input_text.alert_slot_1'),\n  states('input_text.alert_slot_2'),\n  states('input_text.alert_slot_3'),\n  states('input_text.alert_slot_4'),\n  states('input_text.alert_slot_5'),\n  states('input_text.alert_slot_6'),\n  states('input_text.alert_slot_7'),\n  states('input_text.alert_slot_8'),\n  states('input_text.alert_slot_9'),\n  states('input_text.alert_slot_10')\n] %} {% set filled = slots | reject('eq', '-') | reject('eq', 'unavailable') | reject('eq', 'unknown') | list %} {%- if filled | length == 0 %} ## ✅ No alerts Everything looks good — no battery or maintenance alerts on record. {%- else %} {%- set first = filled[0].split(' | ') %} ## 🔔 {{ filled | length }} Alert{% if filled | length != 1 %}s{% endif %} on record Last: **{{ first[1] if first | length > 1 else '—' }}** at {{ first[0] }} {%- endif %}"
+    - type: markdown
+      title: Alert History (newest first)
+      content: "{% set slots = [\n  states('input_text.alert_slot_1'),\n  states('input_text.alert_slot_2'),\n  states('input_text.alert_slot_3'),\n  states('input_text.alert_slot_4'),\n  states('input_text.alert_slot_5'),\n  states('input_text.alert_slot_6'),\n  states('input_text.alert_slot_7'),\n  states('input_text.alert_slot_8'),\n  states('input_text.alert_slot_9'),\n  states('input_text.alert_slot_10')\n] %} {% set filled = slots | reject('eq', '-') | reject('eq', 'unavailable') | reject('eq', 'unknown') | list %} {%- if filled | length == 0 %} *No alerts have been logged yet. They will appear here once an automation fires.* {%- else %} {%- for entry in filled %} {%- set parts = entry.split(' | ') %} {%- set ts    = parts[0] if parts | length > 0 else '—' %} {%- set title = parts[1] if parts | length > 1 else '—' %} {%- set msg   = parts[2] if parts | length > 2 else '—' %} **{{ loop.index }}.  {{ title }}** 🕐 {{ ts }} {{ msg }} {%- if not loop.last %}\n--- {% endif %} {%- endfor %} {%- endif %}"
+    - type: button
+      name: Clear All Alerts
+      icon: mdi:delete-sweep
+      icon_height: 30px
+      tap_action:
+        action: call-service
+        service: script.clear_alert_log
+        confirmation:
+          text: Clear all alert history? This cannot be undone.
