@@ -1,6 +1,7 @@
 # Python
 .venv/
 uv.lock
+.python-version
 __pycache__/
 *.py[cod]
 *.egg-info/
