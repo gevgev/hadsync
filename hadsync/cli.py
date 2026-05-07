@@ -11,7 +11,9 @@ from typing_extensions import Annotated
 
 from hadsync import __version__
 import hadsync.output as output
-from hadsync.config import CONFIG_FILENAME, ConfigError, discover_config, load_config, save_config
+from hadsync.config import (
+    CONFIG_FILENAME, WORKSPACE_ENV_VAR, ConfigError, discover_config, load_config, save_config,
+)
 from hadsync.ha_rest import HARestError, get_ha_info
 from hadsync.ha_ws import HAAuthError, HAWebSocketClient, HAWebSocketError
 
@@ -82,7 +84,10 @@ def init() -> None:
 
     ha_url = typer.prompt("Home Assistant URL", default="http://homeassistant.local:8123").rstrip("/")
     token_var = typer.prompt("Token environment variable name", default="HA_TOKEN")
-    workspace_str = typer.prompt("Local workspace directory", default="./ha-dashboards")
+    workspace_str = typer.prompt(
+        f"Local workspace directory\n  (or set {WORKSPACE_ENV_VAR} env var to override at runtime)",
+        default=".",
+    )
 
     token = os.environ.get(token_var)
     if token is None:
@@ -324,13 +329,16 @@ def config_show() -> None:
         output.error(str(e))
         raise typer.Exit(1)
 
+    import os as _os
+    ws_source = f"({WORKSPACE_ENV_VAR} env var)" if _os.environ.get(WORKSPACE_ENV_VAR) else "(config)"
+
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold cyan")
     table.add_column()
     for key, val in [
         ("ha_url", cfg.ha_url),
         ("ha_token", cfg.masked_token()),
-        ("workspace", str(cfg.workspace)),
+        ("workspace", f"{cfg.workspace}  {ws_source}"),
         ("pull.refresh_entities", str(cfg.pull.refresh_entities).lower()),
         ("pull.dashboards", str(cfg.pull.dashboards)),
         ("push.require_validation", str(cfg.push.require_validation).lower()),

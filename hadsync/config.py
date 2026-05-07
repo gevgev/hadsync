@@ -9,6 +9,7 @@ from pydantic import BaseModel, field_validator, ValidationError
 from ruamel.yaml import YAML
 
 CONFIG_FILENAME = ".hadsync.yaml"
+WORKSPACE_ENV_VAR = "HADSYNC_WORKSPACE"
 _ENV_RE = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
 
@@ -34,7 +35,7 @@ class ValidationSettings(BaseModel):
 class Config(BaseModel):
     ha_url: str
     ha_token: str
-    workspace: Path = Path("ha-dashboards")
+    workspace: Path = Path(".")
     pull: PullSettings = PullSettings()
     push: PushSettings = PushSettings()
     validation: ValidationSettings = ValidationSettings()
@@ -98,8 +99,20 @@ def load_config(path: Optional[Path] = None) -> tuple[Config, Path]:
         cfg = Config.model_validate(data)
     except ValidationError as e:
         raise ConfigError(f"Invalid config in {config_path}:\n{e}") from e
-    if not cfg.workspace.is_absolute():
-        cfg = cfg.model_copy(update={"workspace": (config_path.parent / cfg.workspace).resolve()})
+
+    # Workspace resolution priority:
+    #   1. HADSYNC_WORKSPACE env var
+    #   2. workspace in config (relative → resolved against config file's directory)
+    #   3. default (.) → resolves to CWD
+    env_ws = os.environ.get(WORKSPACE_ENV_VAR)
+    if env_ws:
+        workspace = Path(env_ws).expanduser().resolve()
+    elif not cfg.workspace.is_absolute():
+        workspace = (config_path.parent / cfg.workspace).resolve()
+    else:
+        workspace = cfg.workspace.resolve()
+
+    cfg = cfg.model_copy(update={"workspace": workspace})
     return cfg, config_path
 
 

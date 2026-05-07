@@ -5,7 +5,9 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-from hadsync.config import Config, ConfigError, discover_config, load_config, save_config
+from hadsync.config import (
+    Config, ConfigError, WORKSPACE_ENV_VAR, discover_config, load_config, save_config,
+)
 
 _yaml = YAML()
 
@@ -87,6 +89,33 @@ class TestLoadConfig:
         cfg_path.write_text("key: [unclosed\n")
         with pytest.raises(ConfigError):
             load_config(cfg_path)
+
+    def test_hadsync_workspace_env_var_overrides_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HA_TOKEN", "tok")
+        override = tmp_path / "override_ws"
+        monkeypatch.setenv(WORKSPACE_ENV_VAR, str(override))
+        _write_config(tmp_path / ".hadsync.yaml", {
+            "ha_url": "http://ha.local:8123",
+            "ha_token": "${HA_TOKEN}",
+            "workspace": "./other",
+        })
+        cfg, _ = load_config(tmp_path / ".hadsync.yaml")
+        assert cfg.workspace == override.resolve()
+
+    def test_default_workspace_resolves_to_config_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv(WORKSPACE_ENV_VAR, raising=False)
+        monkeypatch.setenv("HA_TOKEN", "tok")
+        _write_config(tmp_path / ".hadsync.yaml", {
+            "ha_url": "http://ha.local:8123",
+            "ha_token": "${HA_TOKEN}",
+        })
+        cfg, _ = load_config(tmp_path / ".hadsync.yaml")
+        # default workspace "." resolves relative to config file's directory
+        assert cfg.workspace == tmp_path.resolve()
 
 
 class TestMaskedToken:

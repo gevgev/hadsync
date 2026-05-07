@@ -19,3 +19,6 @@ htmlcov/
 # hadsync runtime files
 .hadsync-state.json
 .ha-entities.json
+
+# dashboard workspace — lives in its own repo
+ha-dashboards/
