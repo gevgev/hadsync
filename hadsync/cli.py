@@ -83,7 +83,23 @@ def init() -> None:
             raise typer.Exit()
 
     ha_url = typer.prompt("Home Assistant URL", default="http://homeassistant.local:8123").rstrip("/")
-    token_var = typer.prompt("Token environment variable name", default="HA_TOKEN")
+
+    output.info("Enter the NAME of the environment variable that holds your HA long-lived token.")
+    output.info("Example: if you run  export HA_TOKEN=eyJ...  then enter  HA_TOKEN")
+    while True:
+        token_var = typer.prompt("Token environment variable name", default="HA_TOKEN").strip()
+        # Catch the common mistake of pasting the token value instead of the var name
+        if "." in token_var or token_var.startswith("eyJ") or len(token_var) > 64:
+            output.error(
+                "That looks like a token value, not a variable name. "
+                "Enter just the name, e.g.  HA_TOKEN"
+            )
+            continue
+        if not token_var.replace("_", "").isalnum() or token_var[0].isdigit():
+            output.error("Variable name must contain only letters, digits, and underscores, and not start with a digit.")
+            continue
+        break
+
     workspace_str = typer.prompt(
         f"Local workspace directory\n  (or set {WORKSPACE_ENV_VAR} env var to override at runtime)",
         default=".",
