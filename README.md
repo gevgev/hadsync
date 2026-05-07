@@ -24,29 +24,50 @@ pip install -e .
 
 Requires Python 3.11+.
 
+## Two-Repo Setup (Recommended)
+
+hadsync is designed to keep two things separate:
+
+- **`ha-handsync/`** — this repo, CLI tool source code only
+- **`home-assistant-dashboards/`** — a dedicated repo for your dashboard YAML files
+
+This means your dashboard history is independent of the tool version history, and you can share or back up dashboards without exposing tool internals.
+
 ## Quick Start
 
 ```bash
 # 1. Set your HA long-lived access token
 export HA_TOKEN=eyJ...
 
-# 2. Initialize — connects to HA and creates .hadsync.yaml
+# 2. Create and enter your dashboards repo
+mkdir home-assistant-dashboards && cd home-assistant-dashboards
+git init
+
+# 3. Initialize hadsync (creates .hadsync.yaml here, workspace defaults to .)
 hadsync init
 
-# 3. List available dashboards
+# 4. List available dashboards on your HA instance
 hadsync list
 
-# 4. Pull all dashboards to local YAML
+# 5. Pull all dashboards to local YAML
 hadsync pull
 
-# 5. Edit in VS Code (or any editor)
-code ha-dashboards/
+# 6. Edit in VS Code (or any editor)
+code .
 
-# 6. Validate before pushing
+# 7. Validate before pushing
 hadsync validate
 
-# 7. Push back to HA
+# 8. Push back to HA
 hadsync push
+```
+
+Alternatively, keep `.hadsync.yaml` anywhere and point to the dashboards folder via env var:
+
+```bash
+export HA_TOKEN=eyJ...
+export HADSYNC_WORKSPACE=~/home-assistant-dashboards
+hadsync pull   # works from any directory
 ```
 
 ## Configuration
@@ -56,7 +77,7 @@ hadsync push
 ```yaml
 ha_url: http://homeassistant.local:8123
 ha_token: ${HA_TOKEN}          # env var reference — never store the token literally
-workspace: ./ha-dashboards
+workspace: .                   # path to dashboard YAML files; defaults to current directory
 
 pull:
   refresh_entities: true
@@ -70,6 +91,13 @@ validation:
   warn_on_unknown_entities: true
   entity_cache_max_age_days: 7
 ```
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `HA_TOKEN` | HA long-lived access token (referenced as `${HA_TOKEN}` in config) |
+| `HADSYNC_WORKSPACE` | Override the workspace directory at runtime — takes priority over config |
 
 The token is always referenced via an environment variable. Never embed it in the config file.
 
@@ -93,21 +121,21 @@ The token is always referenced via an environment variable. Never embed it in th
 ## Workspace Layout
 
 ```
-ha-dashboards/                  # committed to git
-  .hadsync.yaml                 # connection config
-  .gitignore                    # auto-generated (excludes state/cache files)
-  lovelace/
-    lovelace.yaml               # Overview dashboard
+home-assistant-dashboards/      # dashboards repo — committed to git
+  .hadsync.yaml                 # connection config (workspace: .)
+  .gitignore                    # excludes state/cache files
   battery-status/
     lovelace.yaml
   lovelace-cameras/
     lovelace.yaml
-  ...
+  dashboard-security/
+    lovelace.yaml
+  ...                           # one directory per dashboard (named by url_path)
 ```
 
-Files excluded from git (listed in `.gitignore`):
-- `.hadsync-state.json` — sync state (last pull time, HA version)
-- `.ha-entities.json` — entity ID cache
+Files excluded from git (auto-added to `.gitignore` by `hadsync init`):
+- `.hadsync-state.json` — last pull/push timestamps per dashboard
+- `.ha-entities.json` — entity ID cache (refreshed on every pull)
 
 ## Development
 
