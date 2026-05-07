@@ -28,7 +28,7 @@ Requires Python 3.11+.
 
 hadsync is designed to keep two things separate:
 
-- **`ha-handsync/`** — this repo, CLI tool source code only
+- **`hadsync/`** — this repo ([github.com/gevgev/hadsync](https://github.com/gevgev/hadsync)), CLI tool source code only
 - **`home-assistant-dashboards/`** — a dedicated repo for your dashboard YAML files
 
 This means your dashboard history is independent of the tool version history, and you can share or back up dashboards without exposing tool internals.
@@ -155,7 +155,7 @@ hadsync list
 
 | Phase | Description | Status |
 |---|---|---|
-| 1 — Core CLI | pull / push / validate / diff / state tracking | 🔨 In progress |
+| 1 — Core CLI | pull / push / validate / diff / status / state tracking | ✅ Complete |
 | 2 — Entity Validation | entity cache, ID validation in YAML | Planned |
 | 3 — Schema Validation & Watch | Lovelace card schema, watch mode | Planned |
 | 4 — VS Code Extension | palette commands, inline diagnostics | Planned |
