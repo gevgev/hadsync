@@ -439,7 +439,108 @@ def diff(
     show: Annotated[bool, typer.Option("--show", help="Print unified diff.")] = False,
 ) -> None:
     """Compare local YAML vs current HA state."""
-    _not_implemented("diff")
+    asyncio.run(_diff_async(dashboard_id, show))
+
+
+async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
+    import difflib
+    from io import StringIO
+    from ruamel.yaml import YAML as _YAML
+    from hadsync.converter import LOVELACE_FILENAME, count_cards, normalize, yaml_file_to_config
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    if dashboard_id:
+        targets = [dashboard_id]
+    else:
+        if not cfg.workspace.exists():
+            output.warn("Workspace directory does not exist. Run 'hadsync pull' first.")
+            raise typer.Exit(1)
+        targets = sorted(
+            d.name for d in cfg.workspace.iterdir()
+            if d.is_dir() and (d / LOVELACE_FILENAME).exists()
+        )
+
+    if not targets:
+        output.warn("No local dashboard files found. Run 'hadsync pull' first.")
+        raise typer.Exit(0)
+
+    try:
+        async with HAWebSocketClient(cfg.ha_url, cfg.ha_token) as client:
+            changed = clean = 0
+            for url_path in targets:
+                yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
+                output.console.print(f"\n[bold cyan]{url_path}[/bold cyan]")
+
+                if not yaml_path.exists():
+                    output.warn("  No local file.")
+                    continue
+
+                try:
+                    local_config = normalize(yaml_file_to_config(yaml_path))
+                except Exception as e:
+                    output.error(f"  Cannot read local file: {e}")
+                    continue
+
+                try:
+                    ha_config = normalize(await client.get_dashboard_config(url_path))
+                except Exception as e:
+                    output.error(f"  Cannot fetch from HA: {e}")
+                    continue
+
+                if local_config == ha_config:
+                    output.success("  No changes — local matches HA.")
+                    clean += 1
+                    continue
+
+                changed += 1
+                ha_views, ha_cards = count_cards(ha_config)
+                local_views, local_cards = count_cards(local_config)
+                output.console.print(f"  HA:    {ha_views} views, {ha_cards} cards")
+                output.console.print(f"  Local: {local_views} views, {local_cards} cards")
+                output.warn("  Local differs from HA — run 'hadsync push' to apply, or 'hadsync pull' to discard.")
+
+                if show:
+                    _yaml = _YAML()
+                    _yaml.default_flow_style = False
+                    _yaml.width = 4096
+                    ha_buf, local_buf = StringIO(), StringIO()
+                    _yaml.dump(ha_config, ha_buf)
+                    _yaml.dump(local_config, local_buf)
+                    diff_lines = list(difflib.unified_diff(
+                        ha_buf.getvalue().splitlines(keepends=True),
+                        local_buf.getvalue().splitlines(keepends=True),
+                        fromfile=f"ha/{url_path}",
+                        tofile=f"local/{url_path}",
+                        lineterm="",
+                    ))
+                    output.console.print()
+                    for line in diff_lines[:200]:
+                        if line.startswith("+++") or line.startswith("---"):
+                            output.console.print(f"[bold]{line}[/bold]", highlight=False)
+                        elif line.startswith("+"):
+                            output.console.print(f"[green]{line}[/green]", highlight=False)
+                        elif line.startswith("-"):
+                            output.console.print(f"[red]{line}[/red]", highlight=False)
+                        elif line.startswith("@@"):
+                            output.console.print(f"[cyan]{line}[/cyan]", highlight=False)
+                        else:
+                            output.console.print(line, highlight=False)
+                    if len(diff_lines) > 200:
+                        output.warn(f"  ... {len(diff_lines) - 200} more lines (diff truncated to 200)")
+
+    except HAAuthError as e:
+        output.error(f"Authentication failed: {e}")
+        raise typer.Exit(1)
+    except HAWebSocketError as e:
+        output.error(f"Connection error: {e}")
+        raise typer.Exit(1)
+
+    output.console.print(f"\n[dim]{changed} changed, {clean} unchanged[/dim]")
 
 
 @app.command()
@@ -447,13 +548,133 @@ def validate(
     dashboard_id: Annotated[Optional[str], typer.Argument(help="Dashboard ID to validate (omit for all).")] = None,
 ) -> None:
     """Validate local YAML files without pushing."""
-    _not_implemented("validate")
+    from hadsync.converter import LOVELACE_FILENAME
+    from hadsync.validator import Severity, has_errors, validate as _validate
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    if dashboard_id:
+        targets = [dashboard_id]
+    else:
+        if not cfg.workspace.exists():
+            output.warn("Workspace directory does not exist. Run 'hadsync pull' first.")
+            raise typer.Exit(1)
+        targets = sorted(
+            d.name for d in cfg.workspace.iterdir()
+            if d.is_dir() and (d / LOVELACE_FILENAME).exists()
+        )
+
+    if not targets:
+        output.warn("No local dashboard files found. Run 'hadsync pull' first.")
+        raise typer.Exit(0)
+
+    total_errors = total_warnings = 0
+
+    for url_path in targets:
+        yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
+        issues = _validate(yaml_path)
+
+        n_err = sum(1 for i in issues if i.severity == Severity.ERROR)
+        n_warn = sum(1 for i in issues if i.severity == Severity.WARN)
+        total_errors += n_err
+        total_warnings += n_warn
+
+        if not issues:
+            label = "[green]PASS[/green]"
+        elif n_err:
+            label = f"[red]FAIL ({n_err} error(s))[/red]"
+        else:
+            label = f"[yellow]WARN ({n_warn} warning(s))[/yellow]"
+
+        output.console.print(f"  {label}  {url_path}")
+        for issue in issues:
+            fn = output.error if issue.severity == Severity.ERROR else output.warn
+            fn(f"       {issue}")
+
+    output.console.print()
+    if total_errors:
+        output.error(f"{total_errors} error(s), {total_warnings} warning(s) — not safe to push")
+        raise typer.Exit(1)
+    elif total_warnings:
+        output.warn(f"0 errors, {total_warnings} warning(s) — review before pushing")
+    else:
+        output.success(f"All {len(targets)} dashboard(s) passed")
 
 
 @app.command()
 def status() -> None:
-    """Show sync status for all dashboards."""
-    _not_implemented("status")
+    """Show sync status for all local dashboards."""
+    from datetime import datetime, timezone
+    from rich.table import Table
+    from hadsync.converter import LOVELACE_FILENAME
+    from hadsync.state import get_all_states
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    states = get_all_states(cfg.workspace)
+
+    local_dirs: set[str] = set()
+    if cfg.workspace.exists():
+        local_dirs = {
+            d.name for d in cfg.workspace.iterdir()
+            if d.is_dir() and (d / LOVELACE_FILENAME).exists()
+        }
+
+    all_dashboards = sorted(set(states.keys()) | local_dirs)
+
+    if not all_dashboards:
+        output.warn("No local dashboards found. Run 'hadsync pull' first.")
+        raise typer.Exit(0)
+
+    def _fmt(ts: Optional[str]) -> str:
+        if not ts:
+            return "[dim]—[/dim]"
+        try:
+            return datetime.fromisoformat(ts).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            return ts[:16]
+
+    def _local_label(url_path: str, last_pull: Optional[str]) -> str:
+        yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
+        if not yaml_path.exists():
+            return "[red]no file[/red]"
+        if not last_pull:
+            return "[yellow]never pulled[/yellow]"
+        try:
+            pull_dt = datetime.fromisoformat(last_pull)
+            if pull_dt.tzinfo is None:
+                pull_dt = pull_dt.replace(tzinfo=timezone.utc)
+            mtime = datetime.fromtimestamp(yaml_path.stat().st_mtime, tz=timezone.utc)
+            return "[yellow]modified[/yellow]" if mtime > pull_dt else "[green]clean[/green]"
+        except Exception:
+            return "[dim]unknown[/dim]"
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Dashboard", style="bold cyan", no_wrap=True)
+    table.add_column("Last Pull")
+    table.add_column("Last Push")
+    table.add_column("Local")
+
+    for url_path in all_dashboards:
+        s = states.get(url_path, {})
+        table.add_row(
+            url_path,
+            _fmt(s.get("last_pull")),
+            _fmt(s.get("last_push")),
+            _local_label(url_path, s.get("last_pull")),
+        )
+
+    output.console.print()
+    output.console.print(table)
+    output.console.print(f"\n[dim]Workspace: {cfg.workspace}[/dim]")
 
 
 @entities_app.command("refresh")
