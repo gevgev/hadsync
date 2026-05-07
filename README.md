@@ -18,11 +18,19 @@ HA stores Lovelace dashboard configs in its internal storage layer. There is no 
 
 ```bash
 pip install hadsync          # once published to PyPI
-# or from source:
-pip install -e .
 ```
 
 Requires Python 3.11+.
+
+### Install from source
+
+```bash
+# with pip
+pip install -e ".[dev]"
+
+# with uv (faster, manages virtualenv automatically)
+uv sync --extra dev
+```
 
 ## Two-Repo Setup (Recommended)
 
@@ -140,7 +148,10 @@ Files excluded from git (auto-added to `.gitignore` by `hadsync init`):
 ## Development
 
 ```bash
-# Install with dev dependencies
+# Install with dev dependencies (uv — recommended)
+uv sync --extra dev
+
+# or with pip
 pip install -e ".[dev]"
 
 # Run tests
