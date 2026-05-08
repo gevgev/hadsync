@@ -13,10 +13,14 @@ HA stores Lovelace dashboard configs in its internal storage layer. There is no 
 ## Features
 
 - Pull any or all Lovelace dashboards from a live HA instance to local YAML
-- Push locally edited YAML back to HA with pre-push validation
-- Diff local state vs live HA state before pushing
-- Entity ID validation against a cached HA entity registry (Phase 2)
-- Git-friendly: plain YAML files that work naturally with version control
+- Push locally edited YAML back to HA — change summary, destructive-change warnings, explicit confirmation
+- Three-phase validation (syntax → entity IDs → card schema) run before every push
+- Diff local YAML vs live HA state with view-level change summary and optional unified diff
+- Entity ID validation against a cached HA entity registry (621 entities on a typical instance)
+- Card schema validation — 35 standard Lovelace card types, `custom:*` always allowed
+- Watch mode — validates on every file save; optional auto-push when validation passes
+- Status table — last pull/push timestamps and local change detection per dashboard
+- Git-friendly: plain YAML files, one directory per dashboard named by `url_path`
 
 ## Installation
 
@@ -103,16 +107,18 @@ ha_token: ${HA_TOKEN}          # env var reference — never store the token lit
 workspace: .                   # path to dashboard YAML files; defaults to current directory
 
 pull:
-  refresh_entities: true
+  refresh_entities: true       # refresh entity cache on every pull
   dashboards: all              # or list: [lovelace, battery-status]
 
 push:
-  require_validation: true
-  confirm: true
+  require_validation: true     # block push on validation errors
+  confirm: true                # ask for confirmation before each push
 
 validation:
-  warn_on_unknown_entities: true
-  entity_cache_max_age_days: 7
+  warn_on_unknown_entities: true        # Phase 2: warn vs error for unknown entity IDs
+  entity_cache_max_age_days: 7          # warn if entity cache is older than this
+  custom_card_types: []                 # Phase 3: extra type prefixes treated as valid
+                                        # e.g. ["my-custom:"] alongside custom:*
 ```
 
 ### Environment Variables
@@ -129,17 +135,34 @@ The token is always referenced via an environment variable. Never embed it in th
 | Command | Description |
 |---|---|
 | `hadsync init` | Interactive setup: URL, token env var, workspace dir |
-| `hadsync list` | List all dashboards on the HA instance |
-| `hadsync pull [ID]` | Pull one or all dashboards from HA to local YAML |
-| `hadsync push [ID]` | Push local YAML to HA (validates first, asks confirmation) |
-| `hadsync diff [ID]` | Compare local YAML vs current HA state |
-| `hadsync validate [ID]` | Run validation on local YAML without pushing |
-| `hadsync status` | Show sync status for all dashboards |
-| `hadsync entities refresh` | Refresh the local entity cache from HA |
-| `hadsync entities list [filter]` | List cached entities |
-| `hadsync config show` | Print resolved config (token masked) |
+| `hadsync list` | List all storage-mode dashboards on the HA instance |
+| `hadsync pull [ID]` | Pull one or all dashboards from HA to local YAML; refreshes entity cache |
+| `hadsync push [ID]` | Push local YAML to HA — validates (P1+P2+P3), shows change summary, confirms |
+| `hadsync push [ID] --dry-run` | Show what would be sent without pushing |
+| `hadsync diff [ID]` | Compare local vs HA — view-level change summary |
+| `hadsync diff [ID] --show` | As above, plus coloured unified diff |
+| `hadsync validate [ID]` | Run Phase 1+2+3 validation without pushing |
+| `hadsync watch [ID]` | Watch for file saves and validate automatically |
+| `hadsync watch [ID] --auto-push` | Watch and push to HA when validation passes |
+| `hadsync status` | Table: last pull, last push, local change state per dashboard |
+| `hadsync entities refresh` | Fetch all entity IDs from HA and update local cache |
+| `hadsync entities list [filter]` | List cached entities, filtered by domain or friendly name |
+| `hadsync config show` | Print resolved config (token masked, workspace source shown) |
+| `hadsync config set KEY VALUE` | Set a config value |
 
 **Global flags:** `--dry-run`, `--verbose / -v`, `--quiet / -q`, `--yes / -y`, `--json-output`, `--config PATH`
+
+## Validation
+
+`hadsync validate` (and pre-push validation in `hadsync push`) runs three phases:
+
+| Phase | What it checks |
+|---|---|
+| 1 — Syntax & structure | YAML parse errors (with line numbers), `views` key present and a list, no non-mapping view entries |
+| 2 — Entity IDs | Every `entity:` / `entities:` reference checked against `.ha-entities.json` cache; warns on unknowns; skipped if cache absent |
+| 3 — Card schema | Each card's `type` is a known standard type; required fields are present; `custom:*` cards always pass |
+
+Phase 2 is silently skipped if the entity cache doesn't exist yet — run `hadsync entities refresh` to enable it. Phase 3 warns on unknown types rather than blocking, so HACS cards never cause failures.
 
 ## Workspace Layout
 
@@ -180,8 +203,8 @@ hadsync list
 | Phase | Description | Status |
 |---|---|---|
 | 1 — Core CLI | pull / push / validate / diff / status / state tracking | ✅ Complete |
-| 2 — Entity Validation | entity cache, ID validation in YAML | Planned |
-| 3 — Schema Validation & Watch | Lovelace card schema, watch mode | Planned |
+| 2 — Entity Validation | entity cache, entity ID existence checks in YAML | ✅ Complete |
+| 3 — Schema Validation & Watch | card type schema, watch mode, auto-push, enhanced diff | ✅ Complete |
 | 4 — VS Code Extension | palette commands, inline diagnostics | Planned |
 
 ## HA API Notes
