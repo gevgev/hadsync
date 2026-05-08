@@ -30,6 +30,7 @@ class PushSettings(BaseModel):
 class ValidationSettings(BaseModel):
     warn_on_unknown_entities: bool = True
     entity_cache_max_age_days: int = 7
+    custom_card_types: list[str] = []  # prefixes treated as valid beyond custom:
 
 
 class Config(BaseModel):

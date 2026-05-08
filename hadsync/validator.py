@@ -133,5 +133,36 @@ def validate_entities(
     return issues
 
 
+# ---------------------------------------------------------------------------
+# Phase 3 — Card type and required-field schema checks
+# ---------------------------------------------------------------------------
+
+def validate_schema(
+    path: Path,
+    custom_card_types: list[str] | None = None,
+) -> list[ValidationIssue]:
+    """Phase 3: check card types and required fields against the bundled schema.
+
+    custom:* prefixed types are always allowed. Additional prefixes can be
+    passed via custom_card_types (mirrors validation.custom_card_types config).
+    """
+    from ruamel.yaml import YAML
+    from hadsync.schema import validate_cards
+
+    _yaml = YAML()
+    try:
+        config = _yaml.load(path)
+    except Exception:
+        return []  # syntax errors caught by Phase 1
+
+    if not isinstance(config, dict):
+        return []
+
+    return [
+        ValidationIssue(Severity[sev], msg, line)
+        for sev, msg, line in validate_cards(config, custom_card_types)
+    ]
+
+
 def has_errors(issues: list[ValidationIssue]) -> bool:
     return any(i.severity == Severity.ERROR for i in issues)

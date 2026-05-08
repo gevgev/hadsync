@@ -345,15 +345,16 @@ async def _push_async(dashboard_id: Optional[str], skip_validation: bool) -> Non
                     skipped += 1
                     continue
 
-                # --- Validation (Phase 1 + Phase 2) ---
+                # --- Validation (Phase 1 + 2 + 3) ---
                 if not skip_validation:
-                    from hadsync.validator import validate_entities
+                    from hadsync.validator import validate_entities, validate_schema
                     issues = validate(yaml_path)
                     issues += validate_entities(
                         yaml_path, cfg.workspace,
                         warn_on_unknown=cfg.validation.warn_on_unknown_entities,
                         max_age_days=cfg.validation.entity_cache_max_age_days,
                     )
+                    issues += validate_schema(yaml_path, cfg.validation.custom_card_types)
                     for issue in issues:
                         fn = output.error if issue.severity == Severity.ERROR else output.warn
                         fn(f"  {issue}")
@@ -448,6 +449,32 @@ def diff(
     asyncio.run(_diff_async(dashboard_id, show))
 
 
+def _view_key(view: dict, idx: int) -> str:
+    return view.get("path") or view.get("title") or f"view_{idx}"
+
+
+def _print_view_diff(ha_config: dict, local_config: dict) -> None:
+    """Print a view-by-view change summary between HA and local configs."""
+    ha_views = {_view_key(v, i): v for i, v in enumerate(ha_config.get("views", []))}
+    local_views = {_view_key(v, i): v for i, v in enumerate(local_config.get("views", []))}
+
+    from hadsync.converter import count_cards
+
+    all_keys = list(dict.fromkeys(list(ha_views) + list(local_views)))  # preserve order
+    for key in all_keys:
+        in_ha = key in ha_views
+        in_local = key in local_views
+        if in_ha and not in_local:
+            output.console.print(f"  [red]  - {key}[/red] (removed)")
+        elif in_local and not in_ha:
+            output.console.print(f"  [green]  + {key}[/green] (added)")
+        elif ha_views[key] != local_views[key]:
+            _, ha_c = count_cards(ha_views[key])
+            _, lc = count_cards(local_views[key])
+            delta = f"{lc - ha_c:+d} cards" if ha_c != lc else "content changed"
+            output.console.print(f"  [yellow]  ~ {key}[/yellow] ({delta})")
+
+
 async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
     import difflib
     from io import StringIO
@@ -508,6 +535,10 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
                 local_views, local_cards = count_cards(local_config)
                 output.console.print(f"  HA:    {ha_views} views, {ha_cards} cards")
                 output.console.print(f"  Local: {local_views} views, {local_cards} cards")
+
+                # Enhanced view-level diff summary
+                _print_view_diff(ha_config, local_config)
+
                 output.warn("  Local differs from HA — run 'hadsync push' to apply, or 'hadsync pull' to discard.")
 
                 if show:
@@ -578,21 +609,23 @@ def validate(
         output.warn("No local dashboard files found. Run 'hadsync pull' first.")
         raise typer.Exit(0)
 
-    from hadsync.validator import validate_entities
+    from hadsync.validator import validate_entities, validate_schema
 
     total_errors = total_warnings = 0
 
     for url_path in targets:
         yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
 
-        # Phase 1
+        # Phase 1 — syntax + structure
         issues = _validate(yaml_path)
-        # Phase 2 (silently skipped if entity cache absent)
+        # Phase 2 — entity existence (skipped silently if cache absent)
         issues += validate_entities(
             yaml_path, cfg.workspace,
             warn_on_unknown=cfg.validation.warn_on_unknown_entities,
             max_age_days=cfg.validation.entity_cache_max_age_days,
         )
+        # Phase 3 — card schema
+        issues += validate_schema(yaml_path, cfg.validation.custom_card_types)
 
         n_err = sum(1 for i in issues if i.severity == Severity.ERROR)
         n_warn = sum(1 for i in issues if i.severity == Severity.WARN)
@@ -619,6 +652,30 @@ def validate(
         output.warn(f"0 errors, {total_warnings} warning(s) — review before pushing")
     else:
         output.success(f"All {len(targets)} dashboard(s) passed")
+
+
+@app.command()
+def watch(
+    dashboard_id: Annotated[Optional[str], typer.Argument(help="Dashboard ID to watch (omit for all).")] = None,
+    auto_push: Annotated[bool, typer.Option("--auto-push", help="Push to HA automatically after validation passes.")] = False,
+) -> None:
+    """Monitor local YAML files and validate on every save (Phase 1+2+3).
+
+    With --auto-push: pushes to HA automatically when validation passes.
+    """
+    from hadsync.watcher import run_watch
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    if not cfg.workspace.exists():
+        output.error(f"Workspace does not exist: {cfg.workspace}")
+        raise typer.Exit(1)
+
+    run_watch(cfg, auto_push=auto_push, filter_id=dashboard_id)
 
 
 @app.command()
