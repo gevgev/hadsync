@@ -345,9 +345,15 @@ async def _push_async(dashboard_id: Optional[str], skip_validation: bool) -> Non
                     skipped += 1
                     continue
 
-                # --- Validation ---
+                # --- Validation (Phase 1 + Phase 2) ---
                 if not skip_validation:
+                    from hadsync.validator import validate_entities
                     issues = validate(yaml_path)
+                    issues += validate_entities(
+                        yaml_path, cfg.workspace,
+                        warn_on_unknown=cfg.validation.warn_on_unknown_entities,
+                        max_age_days=cfg.validation.entity_cache_max_age_days,
+                    )
                     for issue in issues:
                         fn = output.error if issue.severity == Severity.ERROR else output.warn
                         fn(f"  {issue}")
@@ -572,11 +578,21 @@ def validate(
         output.warn("No local dashboard files found. Run 'hadsync pull' first.")
         raise typer.Exit(0)
 
+    from hadsync.validator import validate_entities
+
     total_errors = total_warnings = 0
 
     for url_path in targets:
         yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
+
+        # Phase 1
         issues = _validate(yaml_path)
+        # Phase 2 (silently skipped if entity cache absent)
+        issues += validate_entities(
+            yaml_path, cfg.workspace,
+            warn_on_unknown=cfg.validation.warn_on_unknown_entities,
+            max_age_days=cfg.validation.entity_cache_max_age_days,
+        )
 
         n_err = sum(1 for i in issues if i.severity == Severity.ERROR)
         n_warn = sum(1 for i in issues if i.severity == Severity.WARN)
@@ -680,15 +696,69 @@ def status() -> None:
 @entities_app.command("refresh")
 def entities_refresh() -> None:
     """Refresh the local entity cache from HA /api/states."""
-    _not_implemented("entities refresh")
+    from hadsync.ha_rest import HARestError, get_entity_states
+    from hadsync.entities import write_entity_cache
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    try:
+        output.info("Fetching entity states from HA...")
+        states = get_entity_states(cfg.ha_url, cfg.ha_token)
+        count = write_entity_cache(cfg.workspace, states)
+        output.success(f"Entity cache refreshed — {count} entities → {cfg.workspace / '.ha-entities.json'}")
+    except HARestError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
 
 
 @entities_app.command("list")
 def entities_list(
     filter_term: Annotated[Optional[str], typer.Argument(help="Filter by domain or name.")] = None,
 ) -> None:
-    """List cached entities, optionally filtered."""
-    _not_implemented("entities list")
+    """List cached entities, optionally filtered by domain or name."""
+    from rich.table import Table
+    from hadsync.entities import cache_age_days, load_entity_cache, search_entities
+
+    try:
+        cfg, _ = load_config(_state.config_path)
+    except ConfigError as e:
+        output.error(str(e))
+        raise typer.Exit(1)
+
+    total = len(load_entity_cache(cfg.workspace).get("entities", {}))
+    if total == 0:
+        output.warn("Entity cache is empty. Run 'hadsync entities refresh' first.")
+        raise typer.Exit(1)
+
+    matched = search_entities(cfg.workspace, filter_term or "")
+
+    if not matched:
+        output.warn(f"No entities matching '{filter_term}'.")
+        raise typer.Exit(0)
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Entity ID", style="bold cyan", no_wrap=True)
+    table.add_column("Friendly Name")
+    table.add_column("Domain", style="dim")
+
+    for entity_id, info in sorted(matched.items()):
+        table.add_row(
+            entity_id,
+            info.get("friendly_name") or "—",
+            info.get("domain", entity_id.split(".")[0]),
+        )
+
+    age = cache_age_days(cfg.workspace)
+    age_str = f"{age:.0f}d old" if age is not None else "unknown age"
+    filter_note = f" matching '{filter_term}'" if filter_term else f" of {total} total"
+
+    output.console.print()
+    output.console.print(table)
+    output.console.print(f"\n[dim]{len(matched)} entities{filter_note} — cache {age_str}[/dim]")
 
 
 @config_app.command("show")

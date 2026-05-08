@@ -22,8 +22,12 @@ class ValidationIssue:
         return f"[{self.severity.value}] {self.message}{loc}"
 
 
+# ---------------------------------------------------------------------------
+# Phase 1 — YAML syntax + structural checks
+# ---------------------------------------------------------------------------
+
 def validate(path: Path) -> list[ValidationIssue]:
-    """Phase 1 validation: YAML syntax + structural checks on a lovelace.yaml file."""
+    """Phase 1: YAML syntax + structural checks. No HA connection required."""
     if not path.exists():
         return [ValidationIssue(Severity.ERROR, f"File not found: {path}")]
 
@@ -63,6 +67,68 @@ def validate(path: Path) -> list[ValidationIssue]:
     for i, view in enumerate(views):
         if not isinstance(view, dict):
             issues.append(ValidationIssue(Severity.ERROR, f"views[{i}] must be a mapping"))
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Entity ID existence checks against local cache
+# ---------------------------------------------------------------------------
+
+def validate_entities(
+    path: Path,
+    workspace: Path,
+    warn_on_unknown: bool = True,
+    max_age_days: int = 7,
+) -> list[ValidationIssue]:
+    """Phase 2: check entity_id references in a lovelace.yaml against the cache.
+
+    Returns an empty list if the entity cache does not exist (Phase 2 silently
+    skipped — user must run 'hadsync entities refresh' to enable this check).
+    """
+    from hadsync.entities import (
+        cache_age_days, entity_id_exists, extract_entity_ids, load_entity_cache,
+    )
+
+    issues: list[ValidationIssue] = []
+
+    # Require an existing cache — skip silently if absent (not an error)
+    cache = load_entity_cache(workspace)
+    if not cache.get("entities"):
+        return []
+
+    age = cache_age_days(workspace)
+    if age is not None and age > max_age_days:
+        issues.append(ValidationIssue(
+            Severity.WARN,
+            f"Entity cache is {age:.0f} day(s) old (limit: {max_age_days}) — "
+            "run 'hadsync entities refresh'",
+        ))
+
+    # Load raw YAML to keep ruamel.yaml line info for reporting
+    from ruamel.yaml import YAML
+    _yaml = YAML()
+    try:
+        config = _yaml.load(path)
+    except Exception:
+        return issues  # syntax errors are caught by Phase 1 validate()
+
+    if not isinstance(config, dict):
+        return issues
+
+    seen: set[str] = set()
+    severity = Severity.WARN if warn_on_unknown else Severity.ERROR
+
+    for entity_id, line in extract_entity_ids(config):
+        if entity_id in seen:
+            continue
+        seen.add(entity_id)
+        if not entity_id_exists(workspace, entity_id):
+            issues.append(ValidationIssue(
+                severity,
+                f"Unknown entity: {entity_id}",
+                line,
+            ))
 
     return issues
 
