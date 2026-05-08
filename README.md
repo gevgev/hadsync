@@ -1,5 +1,9 @@
 # hadsync
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Tested on HA 2026.5](https://img.shields.io/badge/Home%20Assistant-2026.5-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
+
 **Home Assistant Dashboard Sync** — pull, edit, and push Lovelace dashboards as code.
 
 HA stores Lovelace dashboard configs in its internal storage layer. There is no supported workflow for editing dashboards locally in a code editor, tracking changes with git, and pushing updates back safely. `hadsync` bridges that gap via the HA WebSocket API.
