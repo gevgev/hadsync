@@ -203,21 +203,53 @@ hadsync list
 
 The `vscode-hadsync/` directory contains a VS Code extension that wraps the CLI.
 
-**Install:**
+### Installation (one-time)
+
 ```bash
-cd vscode-hadsync
-npm install && npm run compile
-# Then: VS Code → Extensions → "..." → Install from VSIX
-# Or press F5 to open an Extension Development Host
+# 1. Enter the extension directory
+cd /path/to/hadsync/vscode-hadsync
+
+# 2. Install Node dependencies and compile TypeScript
+npm install
+npm run compile        # produces vscode-hadsync/out/
+
+# 3. Package into a .vsix installer file
+npx @vscode/vsce package --no-dependencies
+# → creates  vscode-hadsync/hadsync-0.1.0.vsix
+
+# 4. Install in VS Code (command line — easiest)
+code --install-extension hadsync-0.1.0.vsix
 ```
 
-**Features:**
-- **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel and as editor squiggles
-- **Command palette** (`Cmd+Shift+P`) — pull, push (with confirmation), validate, diff, status, list, entities refresh/search
-- **Status bar** — shows last pull time or modified-dashboard count; click for full status table
-- **Entity autocomplete** — `entity: ` triggers completions from `.ha-entities.json` with friendly name and domain
+After step 4, restart VS Code. The extension activates automatically in any workspace folder that contains a `.hadsync.yaml` file.
 
-**Settings:** `hadsync.executablePath`, `hadsync.validateOnSave` (default: true), `hadsync.autoPushOnSave` (default: false)
+**Alternative (VS Code UI):** `Cmd+Shift+P` → `Extensions: Install from VSIX...` → navigate to `vscode-hadsync/hadsync-0.1.0.vsix` → Open.
+
+### Updating after CLI changes
+
+Re-run steps 2–4 whenever you pull new commits to the hadsync CLI:
+
+```bash
+cd vscode-hadsync
+npm run compile && npx @vscode/vsce package --no-dependencies
+code --install-extension hadsync-0.1.0.vsix
+```
+
+### Features
+
+- **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel (`Cmd+Shift+M`) and as editor squiggles with line numbers
+- **Command palette** (`Cmd+Shift+P`) — pull, push (with VS Code confirmation dialog), validate, diff, status, list, entities refresh/search
+- **Status bar** — bottom-left shows last pull time or modified-dashboard count; click for full status table
+- **Entity autocomplete** — typing `entity: ` triggers completions from `.ha-entities.json` with friendly name and domain
+- **Right-click context menu** — validate / push / diff available directly in any `lovelace.yaml` editor
+
+### Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `hadsync.executablePath` | `""` | Full path to hadsync binary. Leave blank to use PATH. |
+| `hadsync.validateOnSave` | `true` | Validate automatically when a lovelace.yaml is saved. |
+| `hadsync.autoPushOnSave` | `false` | Push to HA automatically after a clean validation on save. |
 
 ## Implementation Status
 

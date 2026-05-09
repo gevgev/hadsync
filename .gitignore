@@ -29,3 +29,4 @@ ha-dashboards/
 # VS Code extension build artifacts
 vscode-hadsync/out/
 vscode-hadsync/node_modules/
+vscode-hadsync/*.vsix

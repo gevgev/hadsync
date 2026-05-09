@@ -58,18 +58,43 @@ Typing `entity: ` or `- ` inside a `lovelace.yaml` file triggers entity ID compl
 
 ---
 
+## Installation
+
+```bash
+# 1. Enter this directory
+cd vscode-hadsync
+
+# 2. Install dependencies and compile
+npm install
+npm run compile
+
+# 3. Package into a .vsix file
+npx @vscode/vsce package --no-dependencies
+# → produces  hadsync-0.1.0.vsix  in this directory
+
+# 4. Install in VS Code
+code --install-extension hadsync-0.1.0.vsix
+```
+
+Restart VS Code. The extension activates automatically in any workspace containing `.hadsync.yaml`.
+
+**VS Code UI alternative:** `Cmd+Shift+P` → `Extensions: Install from VSIX...` → select `hadsync-0.1.0.vsix`.
+
+## Updating
+
+After pulling new commits:
+
+```bash
+npm run compile
+npx @vscode/vsce package --no-dependencies
+code --install-extension hadsync-0.1.0.vsix
+```
+
 ## Development
 
 ```bash
-cd vscode-hadsync
 npm install
-npm run compile   # or: npm run watch
+npm run watch   # recompiles on every TypeScript change
 ```
 
-Press **F5** in VS Code to open an Extension Development Host with the extension loaded.
-
-To package for distribution:
-```bash
-npm install -g @vscode/vsce
-vsce package
-```
+Press **F5** in VS Code (with this folder open) to launch an Extension Development Host — lets you test changes without installing the VSIX.
