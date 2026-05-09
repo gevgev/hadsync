@@ -245,9 +245,9 @@ code --install-extension hadsync-0.1.0.vsix
 - **Entity autocomplete** — typing `entity: ` triggers completions from `.ha-entities.json` with friendly name and domain
 - **Right-click context menu** — validate / push / diff available directly in any `lovelace.yaml` editor
 
-Combined with the [Home Assistant Config Helper](https://marketplace.visualstudio.com/items?itemName=keesschollaart.vscode-home-assistant) extension, the editor gains live entity state awareness — completions show friendly names from your real HA instance, and validation catches unknown or removed entity IDs before they ever reach your dashboard.
+Pair hadsync with the [Home Assistant Config Helper](https://marketplace.visualstudio.com/items?itemName=keesschollaart.vscode-home-assistant) extension for a complete live editing experience: hover over any entity ID to see its **current state, last-changed timestamp, and attributes** pulled directly from your running HA instance — while hadsync validation ensures every referenced entity actually exists.
 
-![Entity ID completions with friendly names, powered by hadsync entity cache and HA Config Helper](docs/vscode-entities-screenshot.jpg)
+![Hovering over an entity ID reveals its live state from HA — current value, last changed time, and attributes — via HA Config Helper](docs/vscode-entities-screenshot.jpg)
 
 ### Settings
 
