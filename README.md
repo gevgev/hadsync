@@ -8,7 +8,11 @@
 
 HA stores Lovelace dashboard configs in its internal storage layer. There is no supported workflow for editing dashboards locally in a code editor, tracking changes with git, and pushing updates back safely. `hadsync` bridges that gap via the HA WebSocket API.
 
-![hadsync VS Code extension — entity autocomplete, dashboard explorer, and status output](docs/vscode-screenshot.jpg)
+![hadsync VS Code extension — dashboard explorer, entity autocomplete, and sync status table](docs/vscode-screenshot.jpg)
+*Dashboard explorer, entity ID autocomplete, and hadsync sync status — all in VS Code.*
+
+![Hovering over an entity ID shows live state, last-changed time, and attributes from your running HA instance](docs/vscode-entities-screenshot.jpg)
+*Hover any entity ID to see its live value and attributes, courtesy of the HA Config Helper extension.*
 
 ---
 
@@ -246,8 +250,6 @@ code --install-extension hadsync-0.1.0.vsix
 - **Right-click context menu** — validate / push / diff available directly in any `lovelace.yaml` editor
 
 Pair hadsync with the [Home Assistant Config Helper](https://marketplace.visualstudio.com/items?itemName=keesschollaart.vscode-home-assistant) extension for a complete live editing experience: hover over any entity ID to see its **current state, last-changed timestamp, and attributes** pulled directly from your running HA instance — while hadsync validation ensures every referenced entity actually exists.
-
-![Hovering over an entity ID reveals its live state from HA — current value, last changed time, and attributes — via HA Config Helper](docs/vscode-entities-screenshot.jpg)
 
 ### Settings
 
