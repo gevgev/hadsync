@@ -237,6 +237,10 @@ code --install-extension hadsync-0.1.0.vsix
 
 ### Features
 
+![hadsync VS Code extension — entity autocomplete, dashboard explorer, and status output](docs/vscode-screenshot.jpg)
+
+*Entity ID autocomplete while editing a dashboard, with the hadsync status table in the output panel.*
+
 - **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel (`Cmd+Shift+M`) and as editor squiggles with line numbers
 - **Command palette** (`Cmd+Shift+P`) — pull, push (with VS Code confirmation dialog), validate, diff, status, list, entities refresh/search
 - **Status bar** — bottom-left shows last pull time or modified-dashboard count; click for full status table
