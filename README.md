@@ -8,6 +8,8 @@
 
 HA stores Lovelace dashboard configs in its internal storage layer. There is no supported workflow for editing dashboards locally in a code editor, tracking changes with git, and pushing updates back safely. `hadsync` bridges that gap via the HA WebSocket API.
 
+![hadsync VS Code extension — entity autocomplete, dashboard explorer, and status output](docs/vscode-screenshot.jpg)
+
 ---
 
 ## Features
@@ -236,10 +238,6 @@ code --install-extension hadsync-0.1.0.vsix
 ```
 
 ### Features
-
-![hadsync VS Code extension — entity autocomplete, dashboard explorer, and status output](docs/vscode-screenshot.jpg)
-
-*Entity ID autocomplete while editing a dashboard, with the hadsync status table in the output panel.*
 
 - **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel (`Cmd+Shift+M`) and as editor squiggles with line numbers
 - **Command palette** (`Cmd+Shift+P`) — pull, push (with VS Code confirmation dialog), validate, diff, status, list, entities refresh/search
