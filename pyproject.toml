@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hadsync"
-version = "0.1.0"
+version = "0.2.0"
 description = "Home Assistant Dashboard Sync — pull, edit, and push Lovelace dashboards as code"
 requires-python = ">=3.11"
 dependencies = [

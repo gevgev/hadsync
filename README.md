@@ -20,6 +20,7 @@ HA stores Lovelace dashboard configs in its internal storage layer. There is no 
 - Card schema validation — 35 standard Lovelace card types, `custom:*` always allowed
 - Watch mode — validates on every file save; optional auto-push when validation passes
 - Status table — last pull/push timestamps and local change detection per dashboard
+- **VS Code extension** — inline diagnostics, command palette, status bar, entity ID autocomplete
 - Git-friendly: plain YAML files, one directory per dashboard named by `url_path`
 
 ## Installation
@@ -198,6 +199,26 @@ export HA_TOKEN=eyJ...
 hadsync list
 ```
 
+## VS Code Extension
+
+The `vscode-hadsync/` directory contains a VS Code extension that wraps the CLI.
+
+**Install:**
+```bash
+cd vscode-hadsync
+npm install && npm run compile
+# Then: VS Code → Extensions → "..." → Install from VSIX
+# Or press F5 to open an Extension Development Host
+```
+
+**Features:**
+- **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel and as editor squiggles
+- **Command palette** (`Cmd+Shift+P`) — pull, push (with confirmation), validate, diff, status, list, entities refresh/search
+- **Status bar** — shows last pull time or modified-dashboard count; click for full status table
+- **Entity autocomplete** — `entity: ` triggers completions from `.ha-entities.json` with friendly name and domain
+
+**Settings:** `hadsync.executablePath`, `hadsync.validateOnSave` (default: true), `hadsync.autoPushOnSave` (default: false)
+
 ## Implementation Status
 
 | Phase | Description | Status |
@@ -205,7 +226,7 @@ hadsync list
 | 1 — Core CLI | pull / push / validate / diff / status / state tracking | ✅ Complete |
 | 2 — Entity Validation | entity cache, entity ID existence checks in YAML | ✅ Complete |
 | 3 — Schema Validation & Watch | card type schema, watch mode, auto-push, enhanced diff | ✅ Complete |
-| 4 — VS Code Extension | palette commands, inline diagnostics | Planned |
+| 4 — VS Code Extension | palette commands, inline diagnostics, entity autocomplete | ✅ Complete |
 
 ## HA API Notes
 
