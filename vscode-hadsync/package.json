@@ -1,0 +1,119 @@
+{
+  "name": "hadsync",
+  "displayName": "hadsync",
+  "description": "Home Assistant Dashboard Sync — Lovelace dashboard editing workflow",
+  "version": "0.1.0",
+  "publisher": "gevgev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gevgev/hadsync"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "Linters"],
+  "keywords": ["home assistant", "lovelace", "dashboard", "yaml", "hadsync"],
+  "activationEvents": [
+    "workspaceContains:**/.hadsync.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "hadsync.pull",
+        "title": "hadsync: Pull Dashboards from HA"
+      },
+      {
+        "command": "hadsync.pullOne",
+        "title": "hadsync: Pull This Dashboard"
+      },
+      {
+        "command": "hadsync.push",
+        "title": "hadsync: Push Dashboards to HA"
+      },
+      {
+        "command": "hadsync.pushOne",
+        "title": "hadsync: Push This Dashboard"
+      },
+      {
+        "command": "hadsync.validate",
+        "title": "hadsync: Validate All Dashboards"
+      },
+      {
+        "command": "hadsync.validateOne",
+        "title": "hadsync: Validate This Dashboard"
+      },
+      {
+        "command": "hadsync.diff",
+        "title": "hadsync: Diff This Dashboard vs HA"
+      },
+      {
+        "command": "hadsync.status",
+        "title": "hadsync: Show Sync Status"
+      },
+      {
+        "command": "hadsync.list",
+        "title": "hadsync: List HA Dashboards"
+      },
+      {
+        "command": "hadsync.entitiesRefresh",
+        "title": "hadsync: Refresh Entity Cache"
+      },
+      {
+        "command": "hadsync.entitiesSearch",
+        "title": "hadsync: Search Entities"
+      }
+    ],
+    "configuration": {
+      "title": "hadsync",
+      "properties": {
+        "hadsync.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the hadsync executable. Leave blank to use hadsync from PATH."
+        },
+        "hadsync.validateOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run validation automatically when a lovelace.yaml file is saved."
+        },
+        "hadsync.autoPushOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push to HA automatically after a successful validation on save."
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceFilename == lovelace.yaml",
+          "command": "hadsync.validateOne",
+          "group": "hadsync"
+        },
+        {
+          "when": "resourceFilename == lovelace.yaml",
+          "command": "hadsync.pushOne",
+          "group": "hadsync"
+        },
+        {
+          "when": "resourceFilename == lovelace.yaml",
+          "command": "hadsync.diff",
+          "group": "hadsync"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0"
+  }
+}

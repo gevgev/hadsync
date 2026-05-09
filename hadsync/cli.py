@@ -610,27 +610,47 @@ def validate(
         raise typer.Exit(0)
 
     from hadsync.validator import validate_entities, validate_schema
+    import json as _json
 
+    # Collect all issues before output so --json-output can emit them atomically
+    all_issues: dict[str, list] = {}
     total_errors = total_warnings = 0
 
     for url_path in targets:
         yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
-
-        # Phase 1 — syntax + structure
         issues = _validate(yaml_path)
-        # Phase 2 — entity existence (skipped silently if cache absent)
         issues += validate_entities(
             yaml_path, cfg.workspace,
             warn_on_unknown=cfg.validation.warn_on_unknown_entities,
             max_age_days=cfg.validation.entity_cache_max_age_days,
         )
-        # Phase 3 — card schema
         issues += validate_schema(yaml_path, cfg.validation.custom_card_types)
+        all_issues[url_path] = issues
+        total_errors += sum(1 for i in issues if i.severity == Severity.ERROR)
+        total_warnings += sum(1 for i in issues if i.severity == Severity.WARN)
 
+    if _state.json_output:
+        result = {
+            "dashboards": {
+                url_path: {
+                    "file": str(cfg.workspace / url_path / LOVELACE_FILENAME),
+                    "passed": not any(i.severity == Severity.ERROR for i in issues),
+                    "issues": [
+                        {"severity": i.severity.value, "message": i.message, "line": i.line}
+                        for i in issues
+                    ],
+                }
+                for url_path, issues in all_issues.items()
+            },
+            "total_errors": total_errors,
+            "total_warnings": total_warnings,
+        }
+        print(_json.dumps(result))
+        raise typer.Exit(1 if total_errors else 0)
+
+    for url_path, issues in all_issues.items():
         n_err = sum(1 for i in issues if i.severity == Severity.ERROR)
         n_warn = sum(1 for i in issues if i.severity == Severity.WARN)
-        total_errors += n_err
-        total_warnings += n_warn
 
         if not issues:
             label = "[green]PASS[/green]"
