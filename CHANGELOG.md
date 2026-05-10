@@ -1,5 +1,28 @@
 # Changelog
 
+## [v0.2.1] — 2026-05-10
+
+### Added — Phase 1b (Conflict Detection)
+
+- **`hadsync diff` conflict detection** — stores a hash of the HA config at every pull; diff now classifies each divergence into one of four verdicts:
+  - **CONFLICT** — both local and HA changed since last pull (shown in red with explicit next-step options)
+  - **HA changed only** — warns and suggests `hadsync pull <id>`
+  - **Local changed only** — warns and suggests `hadsync push <id>`
+  - **No baseline** — generic message when dashboard was never pulled with the new hash tracking
+- **Pull timestamp in diff output** — `Last pull: 2026-05-10 18:19  (2h ago)` shown for each dashboard
+- **Annotated change summary** — HA and local card counts now show `← changed since pull` or `(unchanged since pull)` tags
+- **`ha_config_hash`** field in `.hadsync-state.json` — 16-char SHA-256 prefix of the normalized HA config stored on every pull; enables HA-side change detection without keeping a full config snapshot
+
+### Fixed
+
+- **Error handling gaps (community review)** — VS Code extension now shows `showErrorMessage()` popups on command failure; detects `hadsync not found` at activation with an Open Settings link; `onDidSaveTextDocument` wrapped in try/catch; 60-second subprocess timeout prevents VS Code freeze
+- **Python error messages** — `ha_ws.py` now distinguishes connection refused, DNS failure, timeout, and auth_invalid with targeted, actionable messages including next-step hints (e.g. where to generate a long-lived token in HA)
+- **Watch mode resilience** — `watcher.py` event handler wrapped in try/catch so an unexpected crash no longer silently kills the watchdog observer thread
+
+[v0.2.1]: https://github.com/gevgev/hadsync/releases/tag/v0.2.1
+
+---
+
 ## [v0.2.0] — 2026-05-09
 
 Phases 2, 3, and 4 complete. All four design phases are now implemented.

@@ -21,7 +21,7 @@ HA stores Lovelace dashboard configs in its internal storage layer. There is no 
 - Pull any or all Lovelace dashboards from a live HA instance to local YAML
 - Push locally edited YAML back to HA — change summary, destructive-change warnings, explicit confirmation
 - Three-phase validation (syntax → entity IDs → card schema) run before every push
-- Diff local YAML vs live HA state with view-level change summary and optional unified diff
+- Diff local YAML vs live HA state — conflict detection, view-level summary, coloured unified diff
 - Entity ID validation against a cached HA entity registry (621 entities on a typical instance)
 - Card schema validation — 35 standard Lovelace card types, `custom:*` always allowed
 - Watch mode — validates on every file save; optional auto-push when validation passes
@@ -146,7 +146,7 @@ The token is always referenced via an environment variable. Never embed it in th
 | `hadsync pull [ID]` | Pull one or all dashboards from HA to local YAML; refreshes entity cache |
 | `hadsync push [ID]` | Push local YAML to HA — validates (P1+P2+P3), shows change summary, confirms |
 | `hadsync push [ID] --dry-run` | Show what would be sent without pushing |
-| `hadsync diff [ID]` | Compare local vs HA — view-level change summary |
+| `hadsync diff [ID]` | Compare local vs HA — conflict detection, pull timestamp, view-level summary |
 | `hadsync diff [ID] --show` | As above, plus coloured unified diff |
 | `hadsync validate [ID]` | Run Phase 1+2+3 validation without pushing |
 | `hadsync watch [ID]` | Watch for file saves and validate automatically |
@@ -170,6 +170,30 @@ The token is always referenced via an environment variable. Never embed it in th
 | 3 — Card schema | Each card's `type` is a known standard type; required fields are present; `custom:*` cards always pass |
 
 Phase 2 is silently skipped if the entity cache doesn't exist yet — run `hadsync entities refresh` to enable it. Phase 3 warns on unknown types rather than blocking, so HACS cards never cause failures.
+
+## Conflict Detection
+
+Every `hadsync pull` stores a hash of the HA config in `.hadsync-state.json`. `hadsync diff` uses this to classify divergences:
+
+| Situation | HA hash | Local mtime | Verdict |
+|---|---|---|---|
+| Both changed since pull | changed | > last pull | **CONFLICT** — explicit next-step options shown |
+| HA changed, local clean | changed | ≤ last pull | Suggests `hadsync pull <id>` |
+| Local changed, HA untouched | same | > last pull | Suggests `hadsync push <id>` |
+| Never pulled / old state | no hash | — | Diff shown without classification |
+
+Example CONFLICT output:
+```
+battery-status
+  Last pull: 2026-05-10 18:19  (2h ago)
+  HA:    1 views, 5 cards  ← changed since pull
+  Local: 1 views, 5 cards  ← modified since pull
+    ~ Battery Status: content changed
+
+  ✗  CONFLICT — both sides changed since last pull.
+       hadsync push battery-status  — overwrite HA with local (discards HA edits)
+       hadsync pull battery-status  — overwrite local with HA (discards local edits)
+```
 
 ## Workspace Layout
 
