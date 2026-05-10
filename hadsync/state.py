@@ -22,13 +22,20 @@ def _save(workspace: Path, state: dict) -> None:
     path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
-def record_pull(workspace: Path, url_path: str) -> None:
+def record_pull(
+    workspace: Path,
+    url_path: str,
+    ha_config_hash: str | None = None,
+) -> None:
     state = _load(workspace)
     existing = state["dashboards"].get(url_path, {})
-    state["dashboards"][url_path] = {
+    entry: dict = {
         **existing,
         "last_pull": datetime.now(timezone.utc).isoformat(),
     }
+    if ha_config_hash is not None:
+        entry["ha_config_hash"] = ha_config_hash
+    state["dashboards"][url_path] = entry
     _save(workspace, state)
 
 

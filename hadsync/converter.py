@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json as _json
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -45,6 +47,17 @@ def yaml_file_to_config(path: Path) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"{path} does not contain a YAML mapping")
     return data
+
+
+def config_hash(config: dict) -> str:
+    """Return a short stable hash of a normalized config dict.
+
+    Used to detect HA-side changes between pulls without storing the full config.
+    Sorting keys ensures the hash is independent of insertion order.
+    """
+    return hashlib.sha256(
+        _json.dumps(config, sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()[:16]
 
 
 def normalize(obj: object) -> object:

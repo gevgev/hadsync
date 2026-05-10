@@ -201,7 +201,8 @@ def pull(
 
 async def _pull_async(dashboard_id: Optional[str], no_cache: bool) -> None:
     from hadsync.converter import (
-        LOVELACE_FILENAME, config_to_yaml_file, count_cards, is_strategy_dashboard,
+        LOVELACE_FILENAME, config_hash, config_to_yaml_file, count_cards,
+        is_strategy_dashboard, normalize,
     )
     from hadsync.state import record_pull
     from hadsync.ha_rest import HARestError, get_entity_states
@@ -251,7 +252,10 @@ async def _pull_async(dashboard_id: Optional[str], no_cache: bool) -> None:
 
                 yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
                 config_to_yaml_file(config, yaml_path)
-                record_pull(cfg.workspace, url_path)
+                record_pull(
+                    cfg.workspace, url_path,
+                    ha_config_hash=config_hash(normalize(config)),
+                )
 
                 n_views, n_cards = count_cards(config)
                 try:
@@ -477,9 +481,13 @@ def _print_view_diff(ha_config: dict, local_config: dict) -> None:
 
 async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
     import difflib
+    from datetime import datetime, timezone
     from io import StringIO
     from ruamel.yaml import YAML as _YAML
-    from hadsync.converter import LOVELACE_FILENAME, count_cards, normalize, yaml_file_to_config
+    from hadsync.converter import (
+        LOVELACE_FILENAME, config_hash, count_cards, normalize, yaml_file_to_config,
+    )
+    from hadsync.state import get_dashboard_state
 
     try:
         cfg, _ = load_config(_state.config_path)
@@ -502,9 +510,27 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
         output.warn("No local dashboard files found. Run 'hadsync pull' first.")
         raise typer.Exit(0)
 
+    def _fmt_pull_ts(ts: str) -> str:
+        try:
+            dt = datetime.fromisoformat(ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            delta = datetime.now(timezone.utc) - dt
+            mins = int(delta.total_seconds() / 60)
+            if mins < 60:
+                age = f"{mins}m ago"
+            elif mins < 1440:
+                age = f"{mins // 60}h ago"
+            else:
+                age = f"{mins // 1440}d ago"
+            return f"{dt.strftime('%Y-%m-%d %H:%M')}  ({age})"
+        except Exception:
+            return ts[:16]
+
     try:
         async with HAWebSocketClient(cfg.ha_url, cfg.ha_token) as client:
             changed = clean = 0
+
             for url_path in targets:
                 yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
                 output.console.print(f"\n[bold cyan]{url_path}[/bold cyan]")
@@ -525,22 +551,91 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
                     output.error(f"  Cannot fetch from HA: {e}")
                     continue
 
+                # --- Pull context ---
+                ds = get_dashboard_state(cfg.workspace, url_path)
+                last_pull = ds.get("last_pull")
+                stored_hash = ds.get("ha_config_hash")
+
+                if last_pull:
+                    output.console.print(f"  [dim]Last pull: {_fmt_pull_ts(last_pull)}[/dim]")
+
+                # --- In-sync fast path ---
                 if local_config == ha_config:
-                    output.success("  No changes — local matches HA.")
+                    output.success("  In sync — local matches HA.")
                     clean += 1
                     continue
 
                 changed += 1
+
+                # --- Conflict classification ---
+                # Local modified: file mtime > last_pull timestamp
+                local_modified = False
+                if last_pull and yaml_path.exists():
+                    try:
+                        pull_dt = datetime.fromisoformat(last_pull)
+                        if pull_dt.tzinfo is None:
+                            pull_dt = pull_dt.replace(tzinfo=timezone.utc)
+                        mtime = datetime.fromtimestamp(
+                            yaml_path.stat().st_mtime, tz=timezone.utc
+                        )
+                        local_modified = mtime > pull_dt
+                    except Exception:
+                        pass
+
+                # HA modified: current hash differs from stored pull-time hash
+                ha_modified = (
+                    stored_hash is not None and config_hash(ha_config) != stored_hash
+                )
+
+                # --- Change summary ---
                 ha_views, ha_cards = count_cards(ha_config)
                 local_views, local_cards = count_cards(local_config)
-                output.console.print(f"  HA:    {ha_views} views, {ha_cards} cards")
-                output.console.print(f"  Local: {local_views} views, {local_cards} cards")
 
-                # Enhanced view-level diff summary
+                ha_tag = (
+                    "  [yellow]← changed since pull[/yellow]" if ha_modified
+                    else "  [dim](unchanged since pull)[/dim]" if stored_hash
+                    else ""
+                )
+                local_tag = (
+                    "  [yellow]← modified since pull[/yellow]" if local_modified
+                    else "  [dim](clean since pull)[/dim]" if last_pull
+                    else ""
+                )
+
+                output.console.print(f"  HA:    {ha_views} views, {ha_cards} cards{ha_tag}")
+                output.console.print(f"  Local: {local_views} views, {local_cards} cards{local_tag}")
                 _print_view_diff(ha_config, local_config)
 
-                output.warn("  Local differs from HA — run 'hadsync push' to apply, or 'hadsync pull' to discard.")
+                # --- Verdict ---
+                if local_modified and ha_modified:
+                    output.error(
+                        "  CONFLICT — both sides changed since last pull."
+                    )
+                    output.console.print(
+                        f"  [dim]  hadsync push {url_path}[/dim]"
+                        "  — overwrite HA with local  [dim](discards HA edits)[/dim]"
+                    )
+                    output.console.print(
+                        f"  [dim]  hadsync pull {url_path}[/dim]"
+                        "  — overwrite local with HA  [dim](discards local edits)[/dim]"
+                    )
+                elif ha_modified:
+                    output.warn(
+                        f"  HA changed since last pull — run "
+                        f"'hadsync pull {url_path}' to update local."
+                    )
+                elif local_modified:
+                    output.warn(
+                        f"  Local modified since pull — run "
+                        f"'hadsync push {url_path}' to apply to HA."
+                    )
+                else:
+                    output.warn(
+                        "  Local differs from HA — "
+                        "run 'hadsync push' to apply or 'hadsync pull' to discard."
+                    )
 
+                # --- Unified diff (--show) ---
                 if show:
                     _yaml = _YAML()
                     _yaml.default_flow_style = False
@@ -568,7 +663,9 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
                         else:
                             output.console.print(line, highlight=False)
                     if len(diff_lines) > 200:
-                        output.warn(f"  ... {len(diff_lines) - 200} more lines (diff truncated to 200)")
+                        output.warn(
+                            f"  ... {len(diff_lines) - 200} more lines (diff truncated to 200)"
+                        )
 
     except HAAuthError as e:
         output.error(f"Authentication failed: {e}")

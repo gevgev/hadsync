@@ -19,6 +19,16 @@ class TestRecordPull:
         ts = state["dashboards"]["battery-status"].get("last_pull", "")
         assert ts.startswith("2026-") or ts.startswith("20")  # valid ISO timestamp
 
+    def test_stores_ha_config_hash(self, tmp_path: Path) -> None:
+        record_pull(tmp_path, "battery-status", ha_config_hash="abc123def456abcd")
+        ds = get_dashboard_state(tmp_path, "battery-status")
+        assert ds.get("ha_config_hash") == "abc123def456abcd"
+
+    def test_no_hash_key_when_not_provided(self, tmp_path: Path) -> None:
+        record_pull(tmp_path, "battery-status")
+        ds = get_dashboard_state(tmp_path, "battery-status")
+        assert "ha_config_hash" not in ds
+
     def test_preserves_existing_push_timestamp(self, tmp_path: Path) -> None:
         record_push(tmp_path, "battery-status")
         push_time = get_dashboard_state(tmp_path, "battery-status")["last_push"]

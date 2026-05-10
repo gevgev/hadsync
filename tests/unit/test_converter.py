@@ -75,6 +75,29 @@ class TestCountCards:
         assert count_cards({}) == (0, 0)
 
 
+class TestConfigHash:
+    def test_same_config_same_hash(self) -> None:
+        from hadsync.converter import config_hash
+        config = {"views": [{"title": "Home", "cards": []}]}
+        assert config_hash(config) == config_hash(config)
+
+    def test_different_configs_different_hash(self) -> None:
+        from hadsync.converter import config_hash
+        assert config_hash({"views": [{"title": "A"}]}) != config_hash({"views": [{"title": "B"}]})
+
+    def test_key_order_independent_after_normalize(self) -> None:
+        from hadsync.converter import config_hash, normalize
+        a = normalize({"title": "X", "views": []})
+        b = normalize({"views": [], "title": "X"})
+        assert config_hash(a) == config_hash(b)
+
+    def test_returns_16_hex_chars(self) -> None:
+        from hadsync.converter import config_hash
+        h = config_hash({"views": []})
+        assert len(h) == 16
+        assert all(c in "0123456789abcdef" for c in h)
+
+
 class TestRoundTrip:
     def test_write_and_read_produces_identical_dict(self, tmp_path: Path) -> None:
         yaml_path = tmp_path / "lovelace.yaml"
