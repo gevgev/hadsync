@@ -16,6 +16,10 @@ HA stores Lovelace dashboard configs in its internal storage layer. There is no 
 
 ---
 
+[Features](#features) · [Quick Start](#quick-start) · [Commands](#commands) · [In Action](#in-action) · [Conflict Detection](#conflict-detection) · [Validation](#validation) · [VS Code Extension](#vs-code-extension) · [Configuration](#configuration) · [Installation](#installation)
+
+---
+
 ## Features
 
 - Pull any or all Lovelace dashboards from a live HA instance to local YAML
@@ -194,6 +198,20 @@ battery-status
        hadsync push battery-status  — overwrite HA with local (discards HA edits)
        hadsync pull battery-status  — overwrite local with HA (discards local edits)
 ```
+
+## In Action
+
+### `hadsync diff` — conflict summary
+
+![hadsync diff showing a CONFLICT: HA has 6 views 33 cards, local has 6 views 32 cards, both changed since last pull](docs/diff-conflict-summary.jpg)
+
+*Both HA and local changed since the last pull — hadsync detects the conflict, identifies the modified view, and shows the two resolution options with their consequences.*
+
+### `hadsync diff --show` — unified diff
+
+![hadsync diff --show displaying the full coloured unified diff below the conflict summary](docs/diff-show-flag.jpg)
+
+*The `--show` flag appends a full coloured unified diff beneath the conflict summary: red lines are what HA currently has, green lines are what your local file contains. Changes are shown at the YAML level so you can see exactly which card fields or view titles were edited on each side.*
 
 ## Workspace Layout
 
