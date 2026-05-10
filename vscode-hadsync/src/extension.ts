@@ -69,6 +69,27 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Re-validate when lovelace.yaml files change on disk externally
+  // (e.g. after 'hadsync pull' in the terminal — VS Code won't fire onDidSaveTextDocument
+  // for changes made by external processes, so stale diagnostics would otherwise linger).
+  const fileWatcher = vscode.workspace.createFileSystemWatcher('**/lovelace.yaml');
+  context.subscriptions.push(
+    fileWatcher.onDidChange(async uri => {
+      const cwd = getWorkspaceCwd();
+      if (!cwd) return;
+      try {
+        await diagnostics.validateDocument(uri);
+        statusBar.refresh(cwd);
+      } catch { /* ignore — validateDocument surfaces its own errors */ }
+    }),
+    fileWatcher.onDidCreate(async uri => {
+      const cwd = getWorkspaceCwd();
+      if (!cwd) return;
+      try { await diagnostics.validateDocument(uri); } catch { /* ignore */ }
+    }),
+    fileWatcher
+  );
+
   // Entity ID autocomplete in lovelace.yaml files
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(

@@ -30,6 +30,22 @@ function formatRelative(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+/**
+ * Returns true if the lovelace.yaml for a given dashboard has been modified
+ * on disk since the last pull — matching the same mtime logic used by
+ * 'hadsync status' in the CLI.
+ */
+function isLocallyModified(cwd: string, urlPath: string, lastPull: string): boolean {
+  try {
+    const yamlPath = path.join(cwd, urlPath, 'lovelace.yaml');
+    const stat = fs.statSync(yamlPath);
+    const pullTime = new Date(lastPull).getTime();
+    return stat.mtimeMs > pullTime;
+  } catch {
+    return false;
+  }
+}
+
 export class HadsyncStatusBar implements vscode.Disposable {
   private readonly item: vscode.StatusBarItem;
 
@@ -56,25 +72,25 @@ export class HadsyncStatusBar implements vscode.Disposable {
       return;
     }
 
-    const dashboards = Object.values(state.dashboards);
-    if (dashboards.length === 0) {
+    const entries = Object.entries(state.dashboards);
+    if (entries.length === 0) {
       this.setIdle();
       return;
     }
 
-    // Find most recent pull
-    const lastPull = dashboards
-      .map(d => d.last_pull)
-      .filter(Boolean)
+    // Most recent pull across all dashboards
+    const lastPull = entries
+      .map(([, d]) => d.last_pull)
+      .filter((ts): ts is string => Boolean(ts))
       .sort()
       .at(-1);
 
-    // Count modified (has pull but no push, or push before pull)
-    const modified = dashboards.filter(d => {
-      if (!d.last_pull) return false;
-      if (!d.last_push) return true;
-      return new Date(d.last_push) < new Date(d.last_pull);
-    }).length;
+    // A dashboard is "locally modified" only when its lovelace.yaml mtime is
+    // newer than last_pull — the same check 'hadsync status' uses.
+    // "Never pushed" alone is NOT a modification.
+    const modified = entries.filter(([urlPath, d]) =>
+      d.last_pull ? isLocallyModified(cwd, urlPath, d.last_pull) : false
+    ).length;
 
     if (modified > 0) {
       this.item.text = `$(sync-ignored) hadsync: ${modified} modified`;
