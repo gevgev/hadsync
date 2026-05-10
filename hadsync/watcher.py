@@ -51,6 +51,14 @@ class _DashboardHandler(FileSystemEventHandler):
         ts = datetime.now().strftime("%H:%M:%S")
         output.console.print(f"\n[dim]{ts}[/dim]  [bold cyan]{url_path}[/bold cyan]  saved")
 
+        try:
+            self._validate_and_push(yaml_path, url_path)
+        except Exception as e:
+            # Catch unexpected errors so the watchdog observer thread keeps running.
+            # A crash here would silently stop all future watch events.
+            output.error(f"  Watch handler crashed unexpectedly: {e}")
+
+    def _validate_and_push(self, yaml_path: Path, url_path: str) -> None:
         cfg = self._cfg
         issues = validate(yaml_path)
         issues += validate_entities(

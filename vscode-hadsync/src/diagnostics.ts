@@ -13,7 +13,7 @@ interface DashboardResult {
   issues: Issue[];
 }
 
-interface ValidationOutput {
+export interface ValidationOutput {
   dashboards: Record<string, DashboardResult>;
   total_errors: number;
   total_warnings: number;
@@ -26,22 +26,49 @@ export class HadsyncDiagnosticsProvider implements vscode.Disposable {
     this.collection = vscode.languages.createDiagnosticCollection('hadsync');
   }
 
-  /** Run validate --json-output and populate the Problems panel. */
+  /**
+   * Run validate --json-output and populate the Problems panel.
+   *
+   * Returns the parsed ValidationOutput on success.
+   * Returns undefined if hadsync could not be run or returned non-JSON output,
+   * and shows an error notification explaining what went wrong.
+   */
   async validate(cwd: string, dashboardId?: string): Promise<ValidationOutput | undefined> {
     const args = ['--json-output', 'validate'];
     if (dashboardId) args.push(dashboardId);
 
     const result = await runHadsync(args, cwd);
 
+    // Executable not found — give an actionable message
+    if (result.notFound) {
+      vscode.window
+        .showErrorMessage(
+          'hadsync: executable not found. Install it or set hadsync.executablePath in settings.',
+          'Open Settings'
+        )
+        .then(choice => {
+          if (choice === 'Open Settings') {
+            vscode.commands.executeCommand('workbench.action.openSettings', 'hadsync');
+          }
+        });
+      return undefined;
+    }
+
     let data: ValidationOutput;
     try {
       data = JSON.parse(result.stdout);
     } catch {
+      // stdout is not JSON — hadsync may have printed a startup error or traceback
+      const hint = result.stdout.trim() || result.stderr.trim() || 'no output received';
+      vscode.window.showErrorMessage(
+        `hadsync: validation output could not be parsed. ${hint.slice(0, 120)}`,
+        'Show Output'
+      );
       return undefined;
     }
 
-    // Clear only the dashboards we just validated
-    for (const [, dashboard] of Object.entries(data.dashboards)) {
+    // Populate Problems panel for each dashboard
+    for (const dashboard of Object.values(data.dashboards)) {
       const uri = vscode.Uri.file(dashboard.file);
       const diagnostics: vscode.Diagnostic[] = dashboard.issues.map(issue => {
         const lineNo = Math.max(0, (issue.line ?? 1) - 1);
@@ -64,9 +91,6 @@ export class HadsyncDiagnosticsProvider implements vscode.Disposable {
   async validateDocument(uri: vscode.Uri): Promise<void> {
     const cwd = getWorkspaceCwd();
     if (!cwd) return;
-
-    // Derive dashboard ID from the file path
-    const { dashboardIdFromUri } = await import('./runner');
     const id = dashboardIdFromUri(uri, cwd);
     await this.validate(cwd, id);
   }
@@ -78,4 +102,14 @@ export class HadsyncDiagnosticsProvider implements vscode.Disposable {
   dispose(): void {
     this.collection.dispose();
   }
+}
+
+function dashboardIdFromUri(uri: vscode.Uri, cwd: string): string | undefined {
+  const path = require('path') as typeof import('path');
+  const rel = path.relative(cwd, uri.fsPath);
+  const parts = rel.split(path.sep);
+  if (parts.length >= 2 && parts[parts.length - 1] === 'lovelace.yaml') {
+    return parts[parts.length - 2];
+  }
+  return undefined;
 }

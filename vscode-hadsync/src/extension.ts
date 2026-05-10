@@ -3,7 +3,28 @@ import { HadsyncCompletionProvider } from './completion';
 import { registerCommands } from './commands';
 import { HadsyncDiagnosticsProvider } from './diagnostics';
 import { HadsyncStatusBar } from './statusBar';
-import { getWorkspaceCwd } from './runner';
+import { getWorkspaceCwd, runHadsync } from './runner';
+
+/**
+ * Check that the hadsync executable is reachable at activation time.
+ * Shows a one-time error notification with a Settings link if it isn't.
+ */
+async function checkExecutable(cwd: string): Promise<void> {
+  const result = await runHadsync(['--version'], cwd);
+  if (result.notFound) {
+    vscode.window
+      .showErrorMessage(
+        'hadsync extension: executable not found on PATH. '
+        + 'Install hadsync (uv tool install /path/to/hadsync) or set hadsync.executablePath.',
+        'Open Settings'
+      )
+      .then(choice => {
+        if (choice === 'Open Settings') {
+          vscode.commands.executeCommand('workbench.action.openSettings', 'hadsync');
+        }
+      });
+  }
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   const diagnostics = new HadsyncDiagnosticsProvider();
@@ -15,28 +36,35 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async doc => {
       if (!doc.fileName.endsWith('lovelace.yaml')) return;
-
       const cwd = getWorkspaceCwd();
       if (!cwd) return;
-
       const config = vscode.workspace.getConfiguration('hadsync');
       if (!config.get<boolean>('validateOnSave', true)) return;
 
-      await diagnostics.validateDocument(doc.uri);
-      statusBar.refresh(cwd);
+      try {
+        await diagnostics.validateDocument(doc.uri);
+        statusBar.refresh(cwd);
 
-      if (config.get<boolean>('autoPushOnSave', false)) {
-        // Only auto-push if validation produced no errors
-        const { dashboardIdFromUri } = await import('./runner');
-        const id = dashboardIdFromUri(doc.uri, cwd);
-        const result = await diagnostics.validate(cwd, id);
-        if (result && result.total_errors === 0) {
-          const args = id ? ['push', id, '--yes'] : ['push', '--yes'];
-          vscode.commands.executeCommand('workbench.action.terminal.clear');
-          const { runHadsync } = await import('./runner');
-          await runHadsync(args, cwd);
-          statusBar.refresh(cwd);
+        if (config.get<boolean>('autoPushOnSave', false)) {
+          const id = dashboardIdFromUri(doc.uri, cwd);
+          const result = await diagnostics.validate(cwd, id);
+          // Only auto-push when validation is clean
+          if (result && result.total_errors === 0) {
+            const args = id ? ['push', id, '--yes'] : ['push', '--yes'];
+            const pushResult = await runHadsync(args, cwd);
+            if (pushResult.exitCode !== 0) {
+              vscode.window.showErrorMessage(
+                'hadsync: auto-push failed — see output for details.'
+              );
+            } else {
+              statusBar.refresh(cwd);
+            }
+          }
         }
+      } catch (err) {
+        // Surface unexpected errors from the save hook rather than letting
+        // them silently disappear into the extension host console
+        vscode.window.showErrorMessage(`hadsync: unexpected error on save: ${err}`);
       }
     })
   );
@@ -44,9 +72,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Entity ID autocomplete in lovelace.yaml files
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
-      [
-        { scheme: 'file', pattern: '**/lovelace.yaml' },
-      ],
+      [{ scheme: 'file', pattern: '**/lovelace.yaml' }],
       new HadsyncCompletionProvider(),
       ':', ' ', '-'
     )
@@ -54,17 +80,28 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(diagnostics, statusBar);
 
-  // Initial status bar refresh
   const cwd = getWorkspaceCwd();
-  if (cwd) statusBar.refresh(cwd);
-
-  // Validate all dashboards on activation if workspace has .hadsync.yaml
   if (cwd) {
+    // Check the executable is reachable before doing anything else
+    checkExecutable(cwd);
+    statusBar.refresh(cwd);
+
     const config = vscode.workspace.getConfiguration('hadsync');
     if (config.get<boolean>('validateOnSave', true)) {
+      // Initial validation on activation — fire and forget; errors handled inside validate()
       diagnostics.validate(cwd);
     }
   }
+}
+
+function dashboardIdFromUri(uri: vscode.Uri, cwd: string): string | undefined {
+  const path = require('path') as typeof import('path');
+  const rel = path.relative(cwd, uri.fsPath);
+  const parts = rel.split(path.sep);
+  if (parts.length >= 2 && parts[parts.length - 1] === 'lovelace.yaml') {
+    return parts[parts.length - 2];
+  }
+  return undefined;
 }
 
 export function deactivate(): void {

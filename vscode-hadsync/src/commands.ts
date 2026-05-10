@@ -10,7 +10,7 @@ function showOutput(): void {
 }
 
 function appendLine(text: string): void {
-  // Strip ANSI escape codes (Rich terminal output)
+  // Strip ANSI escape codes produced by Rich terminal output
   out.appendLine(text.replace(/\x1b\[[0-9;]*m/g, ''));
 }
 
@@ -31,25 +31,65 @@ function activeDashboardId(): string | undefined {
   return dashboardIdFromUri(editor.document.uri, cwd);
 }
 
+/** Open VS Code settings filtered to the hadsync section. */
+function openSettings(): void {
+  vscode.commands.executeCommand('workbench.action.openSettings', 'hadsync');
+}
+
+/**
+ * Show an error popup appropriate to the failure.
+ * If the executable was not found, offer to open Settings.
+ * Otherwise, offer to show the output panel.
+ */
+function showFailureNotification(label: string, notFound: boolean): void {
+  if (notFound) {
+    vscode.window
+      .showErrorMessage(
+        `hadsync: executable not found. Install hadsync or set hadsync.executablePath.`,
+        'Open Settings'
+      )
+      .then(choice => { if (choice === 'Open Settings') openSettings(); });
+  } else {
+    vscode.window
+      .showErrorMessage(
+        `hadsync: ${label} failed — see output for details.`,
+        'Show Output'
+      )
+      .then(choice => { if (choice === 'Show Output') out.show(); });
+  }
+}
+
+/**
+ * Run a hadsync command, stream its output to the output channel, and show an
+ * error notification if it exits non-zero. Returns true on success.
+ */
 async function runWithProgress(
   label: string,
   args: string[],
   cwd: string,
   statusBar: HadsyncStatusBar
-): Promise<void> {
+): Promise<boolean> {
   statusBar.setWorking(label);
   out.clear();
   showOutput();
 
+  let result = { stdout: '', stderr: '', exitCode: 0, notFound: false };
+
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Window, title: `hadsync: ${label}` },
     async () => {
-      const result = await runHadsync(args, cwd, chunk => appendLine(chunk));
+      result = await runHadsync(args, cwd, chunk => appendLine(chunk));
       if (result.stderr) appendLine(result.stderr);
     }
   );
 
   statusBar.refresh(cwd);
+
+  if (result.exitCode !== 0) {
+    showFailureNotification(label, result.notFound);
+    return false;
+  }
+  return true;
 }
 
 export function registerCommands(
@@ -63,8 +103,8 @@ export function registerCommands(
     vscode.commands.registerCommand('hadsync.pull', async () => {
       const cwd = await requireCwd();
       if (!cwd) return;
-      await runWithProgress('Pulling dashboards…', ['pull'], cwd, statusBar);
-      await diagnostics.validate(cwd);
+      const ok = await runWithProgress('Pulling dashboards…', ['pull'], cwd, statusBar);
+      if (ok) await diagnostics.validate(cwd);
     })
   );
 
@@ -75,8 +115,8 @@ export function registerCommands(
       if (!cwd) return;
       const id = activeDashboardId();
       const args = id ? ['pull', id] : ['pull'];
-      await runWithProgress(`Pulling ${id ?? 'all'}…`, args, cwd, statusBar);
-      if (id) await diagnostics.validate(cwd, id);
+      const ok = await runWithProgress(`Pulling ${id ?? 'all'}…`, args, cwd, statusBar);
+      if (ok && id) await diagnostics.validate(cwd, id);
     })
   );
 
@@ -85,12 +125,12 @@ export function registerCommands(
     vscode.commands.registerCommand('hadsync.push', async () => {
       const cwd = await requireCwd();
       if (!cwd) return;
-      const ok = await vscode.window.showWarningMessage(
+      const confirmed = await vscode.window.showWarningMessage(
         'Push ALL dashboards to Home Assistant?',
         { modal: true },
         'Push'
       );
-      if (ok !== 'Push') return;
+      if (confirmed !== 'Push') return;
       await runWithProgress('Pushing dashboards…', ['push', '--yes'], cwd, statusBar);
     })
   );
@@ -102,15 +142,17 @@ export function registerCommands(
       if (!cwd) return;
       const id = activeDashboardId();
       if (!id) {
-        vscode.window.showWarningMessage('hadsync: Open a lovelace.yaml file to push a specific dashboard.');
+        vscode.window.showWarningMessage(
+          'hadsync: Open a lovelace.yaml file to push a specific dashboard.'
+        );
         return;
       }
-      const ok = await vscode.window.showWarningMessage(
+      const confirmed = await vscode.window.showWarningMessage(
         `Push '${id}' to Home Assistant?`,
         { modal: true },
         'Push'
       );
-      if (ok !== 'Push') return;
+      if (confirmed !== 'Push') return;
       await runWithProgress(`Pushing ${id}…`, ['push', id, '--yes'], cwd, statusBar);
     })
   );
@@ -123,12 +165,21 @@ export function registerCommands(
       statusBar.setWorking('Validating…');
       const result = await diagnostics.validate(cwd);
       statusBar.refresh(cwd);
-      if (result) {
-        const msg = result.total_errors > 0
+      if (result === undefined) {
+        // diagnostics.validate already showed an error notification
+        return;
+      }
+      const msg =
+        result.total_errors > 0
           ? `${result.total_errors} error(s), ${result.total_warnings} warning(s)`
           : result.total_warnings > 0
-            ? `0 errors, ${result.total_warnings} warning(s)`
+            ? `0 errors, ${result.total_warnings} warning(s) — review before pushing`
             : 'All dashboards passed';
+      if (result.total_errors > 0) {
+        vscode.window.showErrorMessage(`hadsync validate: ${msg}`, 'Show Problems').then(
+          choice => { if (choice === 'Show Problems') vscode.commands.executeCommand('workbench.actions.view.problems'); }
+        );
+      } else {
         vscode.window.showInformationMessage(`hadsync validate: ${msg}`);
       }
     })
@@ -143,19 +194,20 @@ export function registerCommands(
       statusBar.setWorking('Validating…');
       const result = await diagnostics.validate(cwd, id);
       statusBar.refresh(cwd);
-      if (result) {
-        const dashboard = id ? result.dashboards[id] : undefined;
-        const issues = dashboard?.issues ?? [];
-        const errs = issues.filter(i => i.severity === 'ERROR').length;
-        const warns = issues.filter(i => i.severity === 'WARN').length;
-        const label = id ?? 'all dashboards';
-        if (errs > 0) {
-          vscode.window.showErrorMessage(`hadsync: ${label} — ${errs} error(s), ${warns} warning(s)`);
-        } else if (warns > 0) {
-          vscode.window.showWarningMessage(`hadsync: ${label} — ${warns} warning(s)`);
-        } else {
-          vscode.window.showInformationMessage(`hadsync: ${label} passed`);
-        }
+      if (result === undefined) return;
+      const dashboard = id ? result.dashboards[id] : undefined;
+      const issues = dashboard?.issues ?? [];
+      const errs = issues.filter(i => i.severity === 'ERROR').length;
+      const warns = issues.filter(i => i.severity === 'WARN').length;
+      const label = id ?? 'all dashboards';
+      if (errs > 0) {
+        vscode.window.showErrorMessage(`hadsync: ${label} — ${errs} error(s), ${warns} warning(s)`, 'Show Problems').then(
+          choice => { if (choice === 'Show Problems') vscode.commands.executeCommand('workbench.actions.view.problems'); }
+        );
+      } else if (warns > 0) {
+        vscode.window.showWarningMessage(`hadsync: ${label} — ${warns} warning(s)`);
+      } else {
+        vscode.window.showInformationMessage(`hadsync: ${label} passed`);
       }
     })
   );
@@ -194,8 +246,10 @@ export function registerCommands(
     vscode.commands.registerCommand('hadsync.entitiesRefresh', async () => {
       const cwd = await requireCwd();
       if (!cwd) return;
-      await runWithProgress('Refreshing entity cache…', ['entities', 'refresh'], cwd, statusBar);
-      vscode.window.showInformationMessage('hadsync: Entity cache refreshed.');
+      const ok = await runWithProgress(
+        'Refreshing entity cache…', ['entities', 'refresh'], cwd, statusBar
+      );
+      if (ok) vscode.window.showInformationMessage('hadsync: Entity cache refreshed.');
     })
   );
 

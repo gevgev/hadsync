@@ -47,22 +47,52 @@ class HAWebSocketClient:
         try:
             self._ws = await connect(self._url, open_timeout=self._timeout)
         except TimeoutError:
-            raise HAWebSocketError(f"Connection timed out: {self._url}")
-        except (OSError, WebSocketException) as e:
+            raise HAWebSocketError(
+                f"Connection timed out after {self._timeout:.0f}s — "
+                f"is HA reachable at {self._url}?"
+            )
+        except ConnectionRefusedError:
+            raise HAWebSocketError(
+                f"Connection refused at {self._url} — "
+                "check ha_url and port in .hadsync.yaml"
+            )
+        except OSError as e:
+            msg = str(e).lower()
+            if "nodename nor servname" in msg or "name or service not known" in msg:
+                raise HAWebSocketError(
+                    f"Cannot resolve hostname — check ha_url in .hadsync.yaml: {self._url}"
+                ) from e
             raise HAWebSocketError(f"Cannot connect to {self._url}: {e}") from e
+        except WebSocketException as e:
+            raise HAWebSocketError(f"WebSocket error connecting to {self._url}: {e}") from e
 
         async with asyncio.timeout(self._timeout):
-            first = json.loads(await self._ws.recv())
+            try:
+                first = json.loads(await self._ws.recv())
+            except json.JSONDecodeError as e:
+                raise HAWebSocketError(f"HA sent malformed data during handshake: {e}") from e
+
             if first.get("type") != "auth_required":
-                raise HAWebSocketError(f"Expected auth_required, got: {first.get('type')}")
+                raise HAWebSocketError(
+                    f"Expected auth_required from HA, got: {first.get('type')!r}"
+                )
 
             await self._ws.send(json.dumps({"type": "auth", "access_token": self._token}))
-            auth_resp = json.loads(await self._ws.recv())
+
+            try:
+                auth_resp = json.loads(await self._ws.recv())
+            except json.JSONDecodeError as e:
+                raise HAWebSocketError(f"HA sent malformed auth response: {e}") from e
 
         if auth_resp.get("type") == "auth_invalid":
-            raise HAAuthError(auth_resp.get("message", "Authentication failed"))
+            raise HAAuthError(
+                "Authentication failed — check that HA_TOKEN is a valid long-lived access token. "
+                "Generate one in HA → Profile → Long-Lived Access Tokens."
+            )
         if auth_resp.get("type") != "auth_ok":
-            raise HAWebSocketError(f"Unexpected auth response: {auth_resp.get('type')}")
+            raise HAWebSocketError(
+                f"Unexpected auth response from HA: {auth_resp.get('type')!r}"
+            )
 
         return self
 
@@ -81,9 +111,12 @@ class HAWebSocketClient:
         async with asyncio.timeout(self._timeout):
             while True:
                 raw = await self._ws.recv()
-                msg = json.loads(raw)
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError as e:
+                    raise HAWebSocketError(f"HA sent malformed JSON: {e}") from e
                 if msg.get("id") != msg_id:
-                    continue  # skip push messages or earlier responses
+                    continue  # skip push messages or responses to other commands
                 if not msg.get("success"):
                     err = msg.get("error", {})
                     raise HACommandError(

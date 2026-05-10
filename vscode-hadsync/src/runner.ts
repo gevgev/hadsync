@@ -7,6 +7,8 @@ export interface RunResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+  /** True when the process could not be started (executable not found). */
+  notFound: boolean;
 }
 
 /** Finds the hadsync executable: config setting → PATH. */
@@ -39,7 +41,13 @@ export function dashboardIdFromUri(uri: vscode.Uri, cwd: string): string | undef
   return undefined;
 }
 
-/** Spawns hadsync with the given args, streams stdout/stderr, resolves on exit. */
+/** Default timeout for any hadsync subprocess (ms). Prevents a hung process from freezing VS Code. */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
+ * Spawns hadsync with the given args, streams stdout/stderr, resolves on exit.
+ * Always resolves — never rejects. Check `result.notFound` and `result.exitCode`.
+ */
 export function runHadsync(
   args: string[],
   cwd: string,
@@ -55,6 +63,20 @@ export function runHadsync(
 
     let stdout = '';
     let stderr = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill();
+        resolve({
+          stdout,
+          stderr: `hadsync timed out after ${DEFAULT_TIMEOUT_MS / 1000}s`,
+          exitCode: 1,
+          notFound: false,
+        });
+      }
+    }, DEFAULT_TIMEOUT_MS);
 
     proc.stdout.on('data', (d: Buffer) => {
       const chunk = d.toString();
@@ -65,10 +87,20 @@ export function runHadsync(
       stderr += d.toString();
     });
     proc.on('close', code => {
-      resolve({ stdout, stderr, exitCode: code ?? 0 });
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve({ stdout, stderr, exitCode: code ?? 0, notFound: false });
+      }
     });
     proc.on('error', err => {
-      resolve({ stdout, stderr: err.message, exitCode: 1 });
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        // ENOENT means the executable was not found on PATH
+        const notFound = (err as NodeJS.ErrnoException).code === 'ENOENT';
+        resolve({ stdout, stderr: err.message, exitCode: 1, notFound });
+      }
     });
   });
 }
