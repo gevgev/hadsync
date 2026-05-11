@@ -213,6 +213,24 @@ battery-status
 
 *The `--show` flag appends a full coloured unified diff beneath the conflict summary: red lines are what HA currently has, green lines are what your local file contains. Changes are shown at the YAML level so you can see exactly which card fields or view titles were edited on each side.*
 
+### VS Code — inline diagnostics and Problems panel
+
+![VS Code editor showing yellow squiggles on lines 192 and 227, with the Problems panel listing an unknown entity ID and a card missing its required entity field](docs/vscode-problems-panel.jpg)
+
+*hadsync validation runs on every save and surfaces issues as inline squiggles and Problems panel entries with exact line numbers — here flagging an unknown entity ID (`sensor.meter_patio_co2_concentration` no longer exists in HA) and a `sensor` card that is missing its required `entity` field. Both issues are caught before anything is pushed to HA.*
+
+### VS Code — entity autocomplete alongside live diagnostics
+
+![VS Code autocomplete dropdown showing sensor.meter_* entity completions while the Problems panel below simultaneously shows two active hadsync warnings](docs/vscode-autocomplete.jpg)
+
+*Typing a partial entity ID opens a completion list drawn from the hadsync entity cache (621 entities, refreshed on pull). Friendly names appear on the right for quick identification. The Problems panel remains visible below — you can fix the flagged issue and pick the correct entity in the same editor without switching context.*
+
+### VS Code — command palette
+
+![VS Code command palette showing all hadsync commands: Validate All Dashboards, Diff This Dashboard, List HA Dashboards, Show Sync Status, Pull, Push, Refresh Entity Cache, and more](docs/vscode-command-palette.jpg)
+
+*All hadsync operations are available from `Cmd+Shift+P`. The full set — validate, diff, pull, push, status, list, entity cache refresh, entity search — without leaving VS Code or opening a terminal.*
+
 ## Workspace Layout
 
 ```
