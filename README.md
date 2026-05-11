@@ -36,29 +36,32 @@ HA stores Lovelace dashboard configs in its internal storage layer. There is no 
 ## Installation
 
 ```bash
-pip install hadsync          # once published to PyPI
+pip install hadsync
 ```
 
 Requires Python 3.11+.
 
-### Install from source
-
-**With uv — installs `hadsync` globally so it works from any directory:**
+**With uv (recommended — installs globally so `hadsync` works from any directory):**
 
 ```bash
-# production install (run from anywhere after this)
-uv tool install /path/to/hadsync
-
-# editable install — code changes take effect immediately, no reinstall needed
-uv tool install --editable /path/to/hadsync
-
-# update after pulling new commits (non-editable)
-uv tool install --reinstall /path/to/hadsync
+uv tool install hadsync
 ```
 
-**With pip:**
+After installation, `hadsync` is available system-wide. Upgrade to a newer release with:
 
 ```bash
+pip install --upgrade hadsync
+# or
+uv tool upgrade hadsync
+```
+
+### Install from source
+
+```bash
+# editable install — code changes take effect immediately
+uv tool install --editable /path/to/hadsync
+
+# or with pip
 pip install -e ".[dev]"
 ```
 
