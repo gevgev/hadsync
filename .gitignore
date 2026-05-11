@@ -31,3 +31,4 @@ ha-dashboards/
 vscode-hadsync/out/
 vscode-hadsync/node_modules/
 vscode-hadsync/*.vsix
+TODO.md
