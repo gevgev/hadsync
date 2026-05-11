@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.3] — 2026-05-11
+
+### Fixed
+
+- **False-positive "modified" in `hadsync status` after a clean pull** — macOS APFS can commit a file's mtime a few microseconds after Python records `last_pull`, making `mtime > last_pull` by a sub-second amount even though the pull itself wrote the file. Fixed by comparing timestamps at whole-second granularity: a difference of less than one second means the pull wrote the file, not a user edit. Applied in `hadsync status`, `hadsync diff` conflict detection, and the VS Code status bar.
+
+[v0.2.3]: https://github.com/gevgev/hadsync/releases/tag/v0.2.3
+
+---
+
 ## [v0.2.2] — 2026-05-10
 
 ### Fixed — VS Code Extension
