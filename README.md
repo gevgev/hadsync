@@ -204,6 +204,36 @@ battery-status
 
 ## In Action
 
+### `hadsync validate` — issues found
+
+![hadsync validate climate-overview showing 2 warnings: unknown entity on line 192 and a card missing its entity field on line 227](docs/cli-validate-warnings.jpg)
+
+*Validation catches two problems before anything reaches HA: an entity ID that no longer exists in the registry, and a `sensor` card missing its required `entity` field. Both are reported with exact line numbers.*
+
+### `hadsync validate` — all clear
+
+![hadsync validate climate-overview showing PASS after the issues were fixed](docs/cli-validate-pass.jpg)
+
+*After fixing the two issues the dashboard passes cleanly. The same command validates all dashboards at once when run without an ID argument.*
+
+### `hadsync validate` — full suite
+
+![hadsync validate showing all 13 dashboards with PASS](docs/cli-validate-all-pass.jpg)
+
+*All 13 storage-mode dashboards pass in a single run — safe to use in CI pipelines since the command exits non-zero on any error.*
+
+### `hadsync status` — sync overview
+
+![hadsync status table showing 13 dashboards with last pull and push timestamps; climate-overview highlighted as modified](docs/cli-status.jpg)
+
+*A quick at-a-glance table showing when each dashboard was last pulled, when it was last pushed, and whether the local file has been modified since the pull. `climate-overview` shows as `modified` — a local edit is pending.*
+
+### `hadsync push` — safe confirmation
+
+![hadsync push climate-overview showing the view and card counts for HA vs local before asking for confirmation](docs/cli-push.jpg)
+
+*Before pushing, hadsync shows the current HA state alongside what would be sent — 6 views, 32 cards on both sides here — and requires an explicit `y` to proceed. A `--dry-run` flag shows this summary without connecting to HA at all.*
+
 ### `hadsync diff` — conflict summary
 
 ![hadsync diff showing a CONFLICT: HA has 6 views 33 cards, local has 6 views 32 cards, both changed since last pull](docs/diff-conflict-summary.jpg)
