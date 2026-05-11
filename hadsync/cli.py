@@ -578,7 +578,9 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
                         mtime = datetime.fromtimestamp(
                             yaml_path.stat().st_mtime, tz=timezone.utc
                         )
-                        local_modified = mtime > pull_dt
+                        local_modified = (
+                            mtime.replace(microsecond=0) > pull_dt.replace(microsecond=0)
+                        )
                     except Exception:
                         pass
 
@@ -843,7 +845,12 @@ def status() -> None:
             if pull_dt.tzinfo is None:
                 pull_dt = pull_dt.replace(tzinfo=timezone.utc)
             mtime = datetime.fromtimestamp(yaml_path.stat().st_mtime, tz=timezone.utc)
-            return "[yellow]modified[/yellow]" if mtime > pull_dt else "[green]clean[/green]"
+            # Compare at whole-second granularity. macOS APFS can commit the
+            # file mtime a few microseconds after Python records last_pull,
+            # causing a false-positive "modified" on freshly-pulled files.
+            # A sub-second difference means the pull itself wrote the file.
+            modified = mtime.replace(microsecond=0) > pull_dt.replace(microsecond=0)
+            return "[yellow]modified[/yellow]" if modified else "[green]clean[/green]"
         except Exception:
             return "[dim]unknown[/dim]"
 

@@ -40,7 +40,12 @@ function isLocallyModified(cwd: string, urlPath: string, lastPull: string): bool
     const yamlPath = path.join(cwd, urlPath, 'lovelace.yaml');
     const stat = fs.statSync(yamlPath);
     const pullTime = new Date(lastPull).getTime();
-    return stat.mtimeMs > pullTime;
+    // Compare at whole-second granularity to avoid a false-positive on freshly
+    // pulled files: macOS APFS can commit the mtime a few microseconds after
+    // the pull records last_pull, making mtime > pullTime by a tiny amount.
+    const mtimeSec = Math.floor(stat.mtimeMs / 1000);
+    const pullSec = Math.floor(pullTime / 1000);
+    return mtimeSec > pullSec;
   } catch {
     return false;
   }
