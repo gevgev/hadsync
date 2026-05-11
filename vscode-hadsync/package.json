@@ -2,7 +2,7 @@
   "name": "hadsync",
   "displayName": "hadsync",
   "description": "Home Assistant Dashboard Sync — Lovelace dashboard editing workflow",
-  "version": "0.1.0",
+  "version": "0.2.3",
   "publisher": "gevgev",
   "license": "MIT",
   "repository": {
