@@ -285,9 +285,9 @@ code --install-extension hadsync-0.1.0.vsix
 
 ### Features
 
-- **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel (`Cmd+Shift+M`) and as editor squiggles with line numbers
+- **Inline diagnostics** — validates every `lovelace.yaml` on save; errors and warnings appear in the Problems panel (`Cmd+Shift+M`) and as editor squiggles with line numbers; **automatically re-validates when files change externally** (e.g. after `hadsync pull` in the terminal)
 - **Command palette** (`Cmd+Shift+P`) — pull, push (with VS Code confirmation dialog), validate, diff, status, list, entities refresh/search
-- **Status bar** — bottom-left shows last pull time or modified-dashboard count; click for full status table
+- **Status bar** — bottom-left shows last pull time or count of locally-modified dashboards (based on file mtime, matching `hadsync status`); click for full status table
 - **Entity autocomplete** — typing `entity: ` triggers completions from `.ha-entities.json` with friendly name and domain
 - **Right-click context menu** — validate / push / diff available directly in any `lovelace.yaml` editor
 

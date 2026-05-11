@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.2] — 2026-05-10
+
+### Fixed — VS Code Extension
+
+- **Stale diagnostics after external pull** — Problems panel no longer retains old errors after `hadsync pull` is run from the terminal. A `FileSystemWatcher` on `**/lovelace.yaml` now re-validates automatically when any file changes on disk, regardless of whether the change came from VS Code or an external process.
+- **Incorrect "N modified" in status bar** — The status bar was counting every dashboard that had never been pushed as "modified", showing e.g. `13 modified` immediately after a clean pull. Fixed to use the same mtime-vs-last_pull comparison as `hadsync status` in the CLI — "modified" now means the local file was actually edited since the last pull.
+
+[v0.2.2]: https://github.com/gevgev/hadsync/releases/tag/v0.2.2
+
+---
+
 ## [v0.2.1] — 2026-05-10
 
 ### Added — Phase 1b (Conflict Detection)
