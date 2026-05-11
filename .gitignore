@@ -3,6 +3,7 @@
 uv.lock
 .python-version
 __pycache__/
+dist/
 *.py[cod]
 *.egg-info/
 dist/
