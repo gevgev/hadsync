@@ -12,6 +12,17 @@
 - Only use valid Lovelace card types (tile, button, entities, etc.) — verify before writing 'type: cover' or similar uncommon types
 - Never commit files in gitignored folders; check `.gitignore` before staging
 
+## Pre-Flight Checks
+
+Before any deploy or flash action:
+
+- Verify `HA_TOKEN` is exported (`echo $HA_TOKEN` — abort if empty)
+- Confirm all Lovelace card types in the diff are valid (tile, button, entities, etc.)
+- Ensure flash commands include `--no-logs`
+- Check the target file is not in `.gitignore` before staging
+
+Report any issues before proceeding.
+
 ## Verification Loops
 
 - After framework-related YAML changes (esp-idf vs arduino), test compile before declaring done
