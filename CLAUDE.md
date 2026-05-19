@@ -5,6 +5,7 @@
 - When flashing devices, always use `--no-logs` flag to prevent the command from hanging
 - Verify ESPHome version compatibility before suggesting advanced YAML features like `!override` tags
 - For dashboard YAML files (lovelace.yaml), map to 'home-assistant' file type, not generic 'yaml'
+- Before editing any ESPHome YAML, check the device's framework (esp-idf or arduino) and the installed ESPHome version — only suggest features compatible with both; if unsure, ask first
 
 ## Home Assistant Deployment
 
