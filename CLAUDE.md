@@ -27,3 +27,4 @@ Report any issues before proceeding.
 
 - After framework-related YAML changes (esp-idf vs arduino), test compile before declaring done
 - For bug fixes touching multiple files/labels (e.g., off-by-one arrays), grep for all occurrences first
+- Before fixing any bug, grep the repo for all occurrences of the buggy pattern (same array indexing, same string, same function call) — list them all, then fix in one pass
