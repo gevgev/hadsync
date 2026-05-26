@@ -179,7 +179,7 @@ async def _list_async() -> None:
     table.add_column("URL Path", style="dim")
     table.add_column("Mode", style="dim")
 
-    for panel_key, panel in sorted(panels.items(), key=lambda x: x[1].get("title") or ""):
+    for panel_key, panel in sorted(panels.items(), key=lambda x: _panel_title_sort_key(x[1])):
         url_path = panel.get("url_path", panel_key)
         title = panel.get("title") or url_path
         mode = (panel.get("config") or {}).get("mode", "storage")
@@ -235,7 +235,7 @@ async def _pull_async(dashboard_id: Optional[str], no_cache: bool) -> None:
                 targets = {k: v for k, v in panels.items() if v.get("url_path", k) in wanted}
 
             pulled, skipped = 0, 0
-            for panel_key, panel in sorted(targets.items(), key=lambda x: x[1].get("title") or ""):
+            for panel_key, panel in sorted(targets.items(), key=lambda x: _panel_title_sort_key(x[1])):
                 url_path = panel.get("url_path", panel_key)
                 title = panel.get("title", url_path)
                 try:
@@ -451,6 +451,11 @@ def diff(
 ) -> None:
     """Compare local YAML vs current HA state."""
     asyncio.run(_diff_async(dashboard_id, show))
+
+
+def _panel_title_sort_key(panel: dict) -> str:
+    """Sort key for panel dicts; HA may return title: null."""
+    return panel.get("title") or ""
 
 
 def _view_key(view: dict, idx: int) -> str:
