@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.3)"
+        required: true
 
 permissions:
   contents: write  # needed to create GitHub Releases
@@ -81,7 +86,8 @@ jobs:
       - name: Extract changelog entry for this version
         id: changelog
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          REF="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${REF#v}"
           NOTES=$(awk "/^## \[v?${VERSION}\]/{found=1; next} found && /^---/{exit} found{print}" CHANGELOG.md)
           echo "notes<<EOF" >> "$GITHUB_OUTPUT"
           echo "$NOTES" >> "$GITHUB_OUTPUT"
@@ -90,5 +96,6 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           body: ${{ steps.changelog.outputs.notes }}
           files: dist-vsix/*.vsix
