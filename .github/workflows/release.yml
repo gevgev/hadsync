@@ -31,8 +31,8 @@ jobs:
         with:
           password: ${{ secrets.PYPI_TOKEN }}
 
-  publish-vscode:
-    name: Publish VS Code extension to Marketplace
+  package-vscode:
+    name: Build VS Code extension
     runs-on: ubuntu-latest
 
     steps:
@@ -54,20 +54,20 @@ jobs:
         run: npx @vscode/vsce package --no-dependencies
         working-directory: vscode-hadsync
 
-      - name: Publish to Marketplace
-        run: npx @vscode/vsce publish --no-dependencies --pat ${{ secrets.VSCE_PAT }}
-        working-directory: vscode-hadsync
-
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: hadsync-vsix
           path: vscode-hadsync/*.vsix
 
+  # To publish to the VS Code Marketplace manually after a release:
+  #   cd vscode-hadsync
+  #   npx @vscode/vsce publish --no-dependencies --pat <your-token>
+
   github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [publish-python, publish-vscode]
+    needs: [publish-python, package-vscode]
 
     steps:
       - uses: actions/checkout@v4
