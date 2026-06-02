@@ -85,7 +85,7 @@ Phases 2, 3, and 4 complete. All four design phases are now implemented.
 - **11 palette commands** (`Cmd+Shift+P`): pull (all / active), push (all / active, with confirmation dialog), validate (all / active), diff, status, list, entities refresh, entities search
 - **Inline diagnostics** — on `lovelace.yaml` save, runs `hadsync --json-output validate`; errors and warnings appear in the Problems panel and as editor squiggles with correct line numbers
 - **Status bar** — bottom-left item shows last pull time or modified-dashboard count; reads `.hadsync-state.json` directly; click opens status table
-- **Entity ID autocomplete** — completion items from `.ha-entities.json` triggered by `entity: ` and list item patterns; includes friendly name and domain in detail
+- **Entity ID autocomplete** — completion items from `.ha-entities.json` triggered by `entity:` and list item patterns; includes friendly name and domain in detail
 - **Context menu** — validate / push / diff available on right-click in any `lovelace.yaml` editor
 - **Settings**: `hadsync.executablePath`, `hadsync.validateOnSave` (default: true), `hadsync.autoPushOnSave` (default: false)
 
