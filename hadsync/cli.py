@@ -296,12 +296,13 @@ def push(
     skip_validation: Annotated[
         bool, typer.Option("--skip-validation", help="Skip pre-push validation (not recommended).")
     ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.")] = False,
 ) -> None:
     """Push local YAML dashboards to HA."""
-    asyncio.run(_push_async(dashboard_id, skip_validation))
+    asyncio.run(_push_async(dashboard_id, skip_validation, yes))
 
 
-async def _push_async(dashboard_id: Optional[str], skip_validation: bool) -> None:
+async def _push_async(dashboard_id: Optional[str], skip_validation: bool, yes: bool = False) -> None:
     from rich.table import Table
     from hadsync.converter import LOVELACE_FILENAME, count_cards, normalize, yaml_file_to_config
     from hadsync.validator import Severity, has_errors, validate
@@ -421,7 +422,7 @@ async def _push_async(dashboard_id: Optional[str], skip_validation: bool) -> Non
                     continue
 
                 # --- Confirm ---
-                if cfg.push.confirm and not _state.yes:
+                if cfg.push.confirm and not (_state.yes or yes):
                     confirmed = typer.confirm(f"  Push '{url_path}' to HA?", default=False)
                     if not confirmed:
                         output.info("  Skipped.")
