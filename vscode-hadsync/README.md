@@ -9,9 +9,11 @@ Activates automatically in any workspace that contains a `.hadsync.yaml` file.
 ## Requirements
 
 - The `hadsync` CLI must be installed and on your `PATH`:
+
   ```bash
   uv tool install --editable /path/to/hadsync
   ```
+
 - `HA_TOKEN` environment variable must be set (inherited by VS Code from your shell)
 
 ---
@@ -21,7 +23,7 @@ Activates automatically in any workspace that contains a `.hadsync.yaml` file.
 ### Command Palette (`Cmd+Shift+P`)
 
 | Command | Description |
-|---|---|
+| --- | --- |
 | `hadsync: Pull Dashboards from HA` | Pull all dashboards |
 | `hadsync: Pull This Dashboard` | Pull the dashboard for the open lovelace.yaml |
 | `hadsync: Push Dashboards to HA` | Push all (with confirmation dialog) |
@@ -44,14 +46,14 @@ The bottom-left status bar shows the last pull time and whether any dashboards h
 
 ### Entity Autocomplete
 
-Typing `entity: ` or `- ` inside a `lovelace.yaml` file triggers entity ID completions from the local `.ha-entities.json` cache. Run `hadsync: Refresh Entity Cache` to populate it.
+Typing `entity:` or `-` inside a `lovelace.yaml` file triggers entity ID completions from the local `.ha-entities.json` cache. Run `hadsync: Refresh Entity Cache` to populate it.
 
 ---
 
 ## Settings
 
 | Setting | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `hadsync.executablePath` | `""` | Full path to hadsync binary. Leave blank to use PATH. |
 | `hadsync.validateOnSave` | `true` | Validate automatically on every lovelace.yaml save. |
 | `hadsync.autoPushOnSave` | `false` | Push to HA automatically after a clean validation on save. |
