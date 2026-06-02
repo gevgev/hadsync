@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4] — 2026-06-02
+
+### Fixed
+
+- **`hadsync push --yes` rejected when flag placed after subcommand** — the VS Code extension calls `hadsync push --yes <id>`; this form was previously rejected. Both placements now work. (Closes #5)
+
+---
+
 ## [0.2.3] — 2026-05-11
 
 ### Fixed

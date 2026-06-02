@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.2.4] — 2026-06-02
+
+### Fixed
+
+- **`hadsync push --yes` rejected when flag placed after subcommand** — `--yes` / `-y` was only wired to the global callback, so `hadsync push --yes <id>` (the form used by the VS Code extension) was rejected by typer. Added as a local option on `push`; both `hadsync --yes push` and `hadsync push --yes` now work. (Closes #5)
+- **NULL / missing title crash in `hadsync status` sort** — dashboard entries with no title caused an unhandled `None` comparison during sort. Fixed with a safe fallback key.
+
+### Added
+
+- **Tests for CLI helpers** — `test_cli.py` covering `_panel_title_sort_key` and related helpers; `cli.py` gained a small testability helper extracted from the sort logic.
+
+[v0.2.4]: https://github.com/gevgev/hadsync/releases/tag/v0.2.4
+
+---
+
 ## [v0.2.3] — 2026-05-11
 
 ### Fixed
