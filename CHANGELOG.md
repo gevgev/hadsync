@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.7] — 2026-06-03
+
+### Fixed
+
+- **False-positive "modified" on machines upgraded from older versions** — v0.2.6 fixed the case where `local_content_hash` was present, but state files written by v0.2.1–v0.2.5 only have `ha_config_hash`. The mtime fallback still fired for those entries. Added a tier-2 check: when `ha_config_hash` is present, normalize the local YAML and compare its hash against the stored pull-time HA hash — content match means clean, regardless of mtime. Mtime comparison is now only used for state files predating v0.2.1.
+
+[v0.2.7]: https://github.com/gevgev/hadsync/releases/tag/v0.2.7
+
+---
+
 ## [v0.2.6] — 2026-06-03
 
 ### Fixed
