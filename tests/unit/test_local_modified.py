@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from hadsync.cli import _file_hash, _is_locally_modified
+from hadsync.converter import config_hash, normalize, yaml_file_to_config
 
 
 def _write(path: Path, content: str = "views:\n  - title: Test\n") -> Path:
@@ -91,7 +92,50 @@ class TestIsLocallyModifiedHashBased:
 
 
 # ---------------------------------------------------------------------------
-# _is_locally_modified — mtime fallback (legacy state without local_content_hash)
+# _is_locally_modified — ha_config_hash fallback (legacy state: v0.2.1–v0.2.5)
+# ---------------------------------------------------------------------------
+
+class TestIsLocallyModifiedHaHashFallback:
+    """Tier-2: state has ha_config_hash but no local_content_hash.
+    Machines upgraded from <0.2.6 fall into this path."""
+
+    def _ha_hash(self, yaml_path: Path) -> str:
+        return config_hash(normalize(yaml_file_to_config(yaml_path)))
+
+    def test_clean_when_content_matches_ha_hash(self, tmp_path: Path) -> None:
+        """Core regression: git pull re-writes identical content, mtime is now
+        hours after last_pull — should still report clean via ha_config_hash."""
+        content = "views:\n  - title: Home\n    cards: []\n"
+        f = _write(tmp_path / "dash" / "lovelace.yaml", content)
+        past_pull = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        ha_hash = self._ha_hash(f)
+        ds = {"last_pull": past_pull, "ha_config_hash": ha_hash}
+        # Simulate git re-writing the same bytes (new mtime, same content)
+        f.write_bytes(f.read_bytes())
+        assert _is_locally_modified(f, ds) is False
+
+    def test_modified_when_content_differs_from_ha_hash(self, tmp_path: Path) -> None:
+        content = "views:\n  - title: Home\n    cards: []\n"
+        f = _write(tmp_path / "dash" / "lovelace.yaml", content)
+        ha_hash = self._ha_hash(f)
+        past_pull = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        ds = {"last_pull": past_pull, "ha_config_hash": ha_hash}
+        # User edits the file
+        f.write_text("views:\n  - title: Edited\n    cards: []\n", encoding="utf-8")
+        assert _is_locally_modified(f, ds) is True
+
+    def test_mtime_not_used_when_ha_hash_present(self, tmp_path: Path) -> None:
+        """Even with mtime far after last_pull, ha_hash match wins → clean."""
+        content = "views:\n  - title: Home\n    cards: []\n"
+        f = _write(tmp_path / "dash" / "lovelace.yaml", content)
+        ha_hash = self._ha_hash(f)
+        very_old_pull = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        ds = {"last_pull": very_old_pull, "ha_config_hash": ha_hash}
+        assert _is_locally_modified(f, ds) is False
+
+
+# ---------------------------------------------------------------------------
+# _is_locally_modified — mtime fallback (very old state, pre-v0.2.1)
 # ---------------------------------------------------------------------------
 
 class TestIsLocallyModifiedMtimeFallback:
