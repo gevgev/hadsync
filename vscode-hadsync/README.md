@@ -72,15 +72,15 @@ npm run compile
 
 # 3. Package into a .vsix file
 npx @vscode/vsce package --no-dependencies
-# → produces  hadsync-0.2.3.vsix  in this directory
+# → produces  hadsync-<version>.vsix  in this directory
 
 # 4. Install in VS Code
-code --install-extension hadsync-0.2.3.vsix
+code --install-extension hadsync-$(node -p "require('./package.json').version").vsix
 ```
 
 Restart VS Code. The extension activates automatically in any workspace containing `.hadsync.yaml`.
 
-**VS Code UI alternative:** `Cmd+Shift+P` → `Extensions: Install from VSIX...` → select `hadsync-0.2.3.vsix`.
+**VS Code UI alternative:** `Cmd+Shift+P` → `Extensions: Install from VSIX...` → select the `.vsix` file produced in step 3.
 
 ## Updating
 
@@ -89,7 +89,7 @@ After pulling new commits:
 ```bash
 npm run compile
 npx @vscode/vsce package --no-dependencies
-code --install-extension hadsync-0.2.3.vsix
+code --install-extension hadsync-$(node -p "require('./package.json').version").vsix
 ```
 
 ## Development
