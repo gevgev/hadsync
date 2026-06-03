@@ -1,5 +1,7 @@
 # hadsync
 
+[![CI](https://github.com/gevgev/hadsync/actions/workflows/ci.yml/badge.svg)](https://github.com/gevgev/hadsync/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/hadsync.svg)](https://pypi.org/project/hadsync/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Tested on HA 2026.5](https://img.shields.io/badge/Home%20Assistant-2026.5-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
@@ -298,41 +300,58 @@ export HA_TOKEN=eyJ...
 hadsync list
 ```
 
+### CI
+
+GitHub Actions runs on every push and pull request to `main`:
+
+- **Python tests** — pytest on Python 3.11, 3.12, and 3.13 in parallel
+- **TypeScript compile** — ensures the VS Code extension builds cleanly
+
+### Cutting a release
+
+1. Bump `version` in `pyproject.toml` and `vscode-hadsync/package.json`
+2. Add an entry to `CHANGELOG.md` (and `vscode-hadsync/CHANGELOG.md` if the extension changed)
+3. Commit and push, then push a version tag:
+
+```bash
+git tag v0.X.Y
+git push --tags
+```
+
+The release workflow triggers automatically on the tag and:
+- Runs the full test suite
+- Publishes the Python package to PyPI
+- Builds the `.vsix` and attaches it to a GitHub Release with the changelog entry as the release body
+
 ## VS Code Extension
 
 The `vscode-hadsync/` directory contains a VS Code extension that wraps the CLI.
 
 ### Installation (one-time)
 
+Download the latest `.vsix` from the [GitHub Releases page](https://github.com/gevgev/hadsync/releases/latest), then install it:
+
 ```bash
-# 1. Enter the extension directory
-cd /path/to/hadsync/vscode-hadsync
-
-# 2. Install Node dependencies and compile TypeScript
-npm install
-npm run compile        # produces vscode-hadsync/out/
-
-# 3. Package into a .vsix installer file
-npx @vscode/vsce package --no-dependencies
-# → creates  vscode-hadsync/hadsync-0.1.0.vsix
-
-# 4. Install in VS Code (command line — easiest)
-code --install-extension hadsync-0.1.0.vsix
+code --install-extension hadsync-<version>.vsix
 ```
 
-After step 4, restart VS Code. The extension activates automatically in any workspace folder that contains a `.hadsync.yaml` file.
+**VS Code UI alternative:** `Cmd+Shift+P` → `Extensions: Install from VSIX...` → select the downloaded file.
 
-**Alternative (VS Code UI):** `Cmd+Shift+P` → `Extensions: Install from VSIX...` → navigate to `vscode-hadsync/hadsync-0.1.0.vsix` → Open.
+Restart VS Code. The extension activates automatically in any workspace folder that contains a `.hadsync.yaml` file.
 
-### Updating after CLI changes
-
-Re-run steps 2–4 whenever you pull new commits to the hadsync CLI:
+#### Build from source
 
 ```bash
 cd vscode-hadsync
-npm run compile && npx @vscode/vsce package --no-dependencies
-code --install-extension hadsync-0.1.0.vsix
+npm install
+npm run compile
+npx @vscode/vsce package --no-dependencies
+code --install-extension hadsync-$(node -p "require('./package.json').version").vsix
 ```
+
+### Updating
+
+Download the latest `.vsix` from [Releases](https://github.com/gevgev/hadsync/releases/latest) and re-run the install command — VS Code replaces the previous version automatically.
 
 ### Features
 
