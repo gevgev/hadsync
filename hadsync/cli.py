@@ -50,16 +50,34 @@ def _file_hash(path: Path) -> str:
 def _is_locally_modified(yaml_path: Path, ds: dict) -> bool:
     """Return True if the local file differs from what was last pulled.
 
-    Prefers content-hash comparison (immune to mtime drift from git pull or
-    filesystem clock skew). Falls back to mtime comparison for state entries
-    written before local_content_hash was introduced.
+    Three-tier check, most reliable first:
+
+    1. local_content_hash (stored since v0.2.6) — raw file bytes SHA-256.
+       Immune to mtime drift and YAML round-trip differences.
+    2. ha_config_hash (stored since v0.2.1) — normalized HA config SHA-256.
+       Covers legacy state: parse the local YAML, normalize, hash, compare.
+       Also immune to mtime; handles git pull re-writing identical content.
+    3. mtime vs last_pull — last resort for very old state with no hash at all.
     """
     if not yaml_path.exists():
         return False
-    stored_hash = ds.get("local_content_hash")
-    if stored_hash:
-        return _file_hash(yaml_path) != stored_hash
-    # Legacy fallback: mtime comparison at whole-second granularity.
+
+    # Tier 1: raw file hash (new state)
+    stored_local_hash = ds.get("local_content_hash")
+    if stored_local_hash:
+        return _file_hash(yaml_path) != stored_local_hash
+
+    # Tier 2: normalized content hash against HA pull-time hash (legacy state)
+    ha_hash = ds.get("ha_config_hash")
+    if ha_hash:
+        try:
+            from hadsync.converter import config_hash, normalize, yaml_file_to_config
+            local_hash = config_hash(normalize(yaml_file_to_config(yaml_path)))
+            return local_hash != ha_hash
+        except Exception:
+            pass
+
+    # Tier 3: mtime fallback (very old state, pre-v0.2.1)
     last_pull = ds.get("last_pull")
     if not last_pull:
         return False
