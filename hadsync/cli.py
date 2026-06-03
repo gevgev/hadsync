@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,37 @@ entities_app = typer.Typer(help="Entity cache management.", no_args_is_help=True
 config_app = typer.Typer(help="Configuration management.", no_args_is_help=True)
 app.add_typer(entities_app, name="entities")
 app.add_typer(config_app, name="config")
+
+
+def _file_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
+def _is_locally_modified(yaml_path: Path, ds: dict) -> bool:
+    """Return True if the local file differs from what was last pulled.
+
+    Prefers content-hash comparison (immune to mtime drift from git pull or
+    filesystem clock skew). Falls back to mtime comparison for state entries
+    written before local_content_hash was introduced.
+    """
+    if not yaml_path.exists():
+        return False
+    stored_hash = ds.get("local_content_hash")
+    if stored_hash:
+        return _file_hash(yaml_path) != stored_hash
+    # Legacy fallback: mtime comparison at whole-second granularity.
+    last_pull = ds.get("last_pull")
+    if not last_pull:
+        return False
+    try:
+        from datetime import datetime, timezone
+        pull_dt = datetime.fromisoformat(last_pull)
+        if pull_dt.tzinfo is None:
+            pull_dt = pull_dt.replace(tzinfo=timezone.utc)
+        mtime = datetime.fromtimestamp(yaml_path.stat().st_mtime, tz=timezone.utc)
+        return mtime.replace(microsecond=0) > pull_dt.replace(microsecond=0)
+    except Exception:
+        return False
 
 
 def _version_callback(value: bool) -> None:
@@ -255,6 +287,7 @@ async def _pull_async(dashboard_id: Optional[str], no_cache: bool) -> None:
                 record_pull(
                     cfg.workspace, url_path,
                     ha_config_hash=config_hash(normalize(config)),
+                    local_content_hash=_file_hash(yaml_path),
                 )
 
                 n_views, n_cards = count_cards(config)
@@ -574,21 +607,8 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
                 changed += 1
 
                 # --- Conflict classification ---
-                # Local modified: file mtime > last_pull timestamp
-                local_modified = False
-                if last_pull and yaml_path.exists():
-                    try:
-                        pull_dt = datetime.fromisoformat(last_pull)
-                        if pull_dt.tzinfo is None:
-                            pull_dt = pull_dt.replace(tzinfo=timezone.utc)
-                        mtime = datetime.fromtimestamp(
-                            yaml_path.stat().st_mtime, tz=timezone.utc
-                        )
-                        local_modified = (
-                            mtime.replace(microsecond=0) > pull_dt.replace(microsecond=0)
-                        )
-                    except Exception:
-                        pass
+                # Local modified: content hash differs from pull-time snapshot
+                local_modified = _is_locally_modified(yaml_path, ds)
 
                 # HA modified: current hash differs from stored pull-time hash
                 ha_modified = (
@@ -840,22 +860,14 @@ def status() -> None:
         except Exception:
             return ts[:16]
 
-    def _local_label(url_path: str, last_pull: Optional[str]) -> str:
+    def _local_label(url_path: str, ds: dict) -> str:
         yaml_path = cfg.workspace / url_path / LOVELACE_FILENAME
         if not yaml_path.exists():
             return "[red]no file[/red]"
-        if not last_pull:
+        if not ds.get("last_pull"):
             return "[yellow]never pulled[/yellow]"
         try:
-            pull_dt = datetime.fromisoformat(last_pull)
-            if pull_dt.tzinfo is None:
-                pull_dt = pull_dt.replace(tzinfo=timezone.utc)
-            mtime = datetime.fromtimestamp(yaml_path.stat().st_mtime, tz=timezone.utc)
-            # Compare at whole-second granularity. macOS APFS can commit the
-            # file mtime a few microseconds after Python records last_pull,
-            # causing a false-positive "modified" on freshly-pulled files.
-            # A sub-second difference means the pull itself wrote the file.
-            modified = mtime.replace(microsecond=0) > pull_dt.replace(microsecond=0)
+            modified = _is_locally_modified(yaml_path, ds)
             return "[yellow]modified[/yellow]" if modified else "[green]clean[/green]"
         except Exception:
             return "[dim]unknown[/dim]"
@@ -872,7 +884,7 @@ def status() -> None:
             url_path,
             _fmt(s.get("last_pull")),
             _fmt(s.get("last_push")),
-            _local_label(url_path, s.get("last_pull")),
+            _local_label(url_path, s),
         )
 
     output.console.print()

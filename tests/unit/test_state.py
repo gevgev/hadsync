@@ -29,6 +29,26 @@ class TestRecordPull:
         ds = get_dashboard_state(tmp_path, "battery-status")
         assert "ha_config_hash" not in ds
 
+    def test_stores_local_content_hash(self, tmp_path: Path) -> None:
+        record_pull(tmp_path, "battery-status", local_content_hash="deadbeef01234567")
+        ds = get_dashboard_state(tmp_path, "battery-status")
+        assert ds.get("local_content_hash") == "deadbeef01234567"
+
+    def test_no_local_content_hash_key_when_not_provided(self, tmp_path: Path) -> None:
+        record_pull(tmp_path, "battery-status")
+        ds = get_dashboard_state(tmp_path, "battery-status")
+        assert "local_content_hash" not in ds
+
+    def test_local_content_hash_and_ha_config_hash_stored_together(self, tmp_path: Path) -> None:
+        record_pull(
+            tmp_path, "lovelace",
+            ha_config_hash="ha_hash_1234abcd",
+            local_content_hash="local_hash_5678",
+        )
+        ds = get_dashboard_state(tmp_path, "lovelace")
+        assert ds["ha_config_hash"] == "ha_hash_1234abcd"
+        assert ds["local_content_hash"] == "local_hash_5678"
+
     def test_preserves_existing_push_timestamp(self, tmp_path: Path) -> None:
         record_push(tmp_path, "battery-status")
         push_time = get_dashboard_state(tmp_path, "battery-status")["last_push"]

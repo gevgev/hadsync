@@ -26,6 +26,7 @@ def record_pull(
     workspace: Path,
     url_path: str,
     ha_config_hash: str | None = None,
+    local_content_hash: str | None = None,
 ) -> None:
     state = _load(workspace)
     existing = state["dashboards"].get(url_path, {})
@@ -35,6 +36,8 @@ def record_pull(
     }
     if ha_config_hash is not None:
         entry["ha_config_hash"] = ha_config_hash
+    if local_content_hash is not None:
+        entry["local_content_hash"] = local_content_hash
     state["dashboards"][url_path] = entry
     _save(workspace, state)
 
