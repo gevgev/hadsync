@@ -580,7 +580,7 @@ async def _diff_async(dashboard_id: Optional[str], show: bool) -> None:
                 age = f"{mins // 60}h ago"
             else:
                 age = f"{mins // 1440}d ago"
-            return f"{dt.strftime('%Y-%m-%d %H:%M')}  ({age})"
+            return f"{dt.astimezone().strftime('%Y-%m-%d %H:%M')}  ({age})"
         except Exception:
             return ts[:16]
 
@@ -874,7 +874,10 @@ def status() -> None:
         if not ts:
             return "[dim]—[/dim]"
         try:
-            return datetime.fromisoformat(ts).strftime("%Y-%m-%d %H:%M")
+            dt = datetime.fromisoformat(ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone().strftime("%Y-%m-%d %H:%M")
         except Exception:
             return ts[:16]
 
