@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.8] — 2026-06-03
+
+### Fixed
+
+- **Timestamps in `hadsync status` and `hadsync diff` shown in UTC instead of local time** — `_fmt()` (status table) and `_fmt_pull_ts()` (diff "Last pull" line) now call `.astimezone()` before formatting, converting stored UTC timestamps to the machine's local timezone. (Closes #11)
+
+[v0.2.8]: https://github.com/gevgev/hadsync/releases/tag/v0.2.8
+
+---
+
 ## [v0.2.7] — 2026-06-03
 
 ### Fixed
