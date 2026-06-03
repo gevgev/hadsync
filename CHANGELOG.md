@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.5] — 2026-06-03
+
+### Fixed
+
+- **`hadsync --version` reported 0.2.3 after upgrading to 0.2.4** — `__version__` was a hardcoded string that diverged from the package metadata version when the release was built. Fixed by reading `__version__` dynamically from `importlib.metadata` so it always matches the installed wheel.
+
+[v0.2.5]: https://github.com/gevgev/hadsync/releases/tag/v0.2.5
+
+---
+
 ## [v0.2.4] — 2026-06-02
 
 ### Fixed

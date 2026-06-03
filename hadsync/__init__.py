@@ -1,1 +1,6 @@
-__version__ = "0.2.4"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("hadsync")
+except PackageNotFoundError:
+    __version__ = "unknown"
