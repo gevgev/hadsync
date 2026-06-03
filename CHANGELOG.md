@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.6] — 2026-06-03
+
+### Fixed
+
+- **False-positive "modified" status when file mtime updated by external tools** — `hadsync status` and `hadsync diff` used file mtime vs `last_pull` to detect local changes. `git pull` on a second machine re-writes identical content with a new mtime, triggering a spurious "modified" even though nothing actually changed. Fixed by storing a SHA-256 hash of the local file at pull time (`local_content_hash` in `.hadsync-state.json`) and comparing content instead of timestamps. Legacy state entries without the hash fall back to the old mtime logic. (Closes #7)
+
+[v0.2.6]: https://github.com/gevgev/hadsync/releases/tag/v0.2.6
+
+---
+
 ## [v0.2.5] — 2026-06-03
 
 ### Fixed

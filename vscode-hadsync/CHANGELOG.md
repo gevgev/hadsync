@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.6] — 2026-06-03
+
+### Fixed
+
+- **False-positive "modified" in status bar after `git pull`** — the extension status bar reads `.hadsync-state.json` which now stores a content hash at pull time; `hadsync status` uses hash comparison instead of mtime, so `git pull` re-writing identical YAML no longer shows spurious "N modified" in the status bar. (Closes #7)
+
+---
+
 ## [0.2.4] — 2026-06-02
 
 ### Fixed
